@@ -1,28 +1,32 @@
 package main
 
 import (
-    "DosMq/conf"
-    "DosMq/router"
-    "DosMq/utils"
-    "flag"
-    log "github.com/sirupsen/logrus"
+	"DosMq/db"
+	"DosMq/router"
+	"DosMq/utils"
+	"flag"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-    // config init
-    configName := flag.String("configName", "config", "config file's name.")
-    configPath := flag.String("configPath", "./config", "config file's path.")
-    conf.Init(configName, configPath)
+	// config init
+	configName := flag.String("configName", "config", "config file's name.")
+	configPath := flag.String("configPath", "./config", "config file's path.")
+	utils.ConfigInit(configName, configPath)
 
-    // log init
-    utils.LogInit()
+	// log init
+	utils.LogInit()
 
-    // load router
-    r := router.GetRouter()
-    log.Error("router loaded……")
+	// redis init
+	db.RedisInit()
+	//defer rCoon.Close()
 
-    // run server
-    if err := r.Run(":8080"); err != nil {
-        log.Error(err)
-    }
+	// load router
+	r := router.GetRouter()
+	log.Error("router loaded……")
+
+	// run server
+	if err := r.Run(":8080"); err != nil {
+		log.Error(err)
+	}
 }

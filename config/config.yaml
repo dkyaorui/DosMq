@@ -1,3 +1,10 @@
 log:
   path: "/tmp"
   name: "DosMq.log"
+
+redis:
+  host: 127.0.0.1
+  port: 6379
+  db: 1
+  maxidle: 2
+  maxactive: 12
