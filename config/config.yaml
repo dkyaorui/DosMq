@@ -8,3 +8,9 @@ redis:
   db: 1
   maxidle: 2
   maxactive: 12
+
+mongo:
+  host: 127.0.0.1
+  port: 27017
+  db: dosmq
+  user: root

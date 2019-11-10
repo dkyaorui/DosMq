@@ -1,4 +1,4 @@
-package db
+package redis
 
 import (
     "fmt"
@@ -12,7 +12,7 @@ import (
 
 var RedisClient *redis.Pool
 
-func RedisInit() {
+func Init() {
     redisConfig := viper.GetStringMap("redis")
     redisHost := redisConfig["host"].(string) + ":" + strconv.Itoa(redisConfig["port"].(int))
     redisPassword := viper.GetString("redisPassword")
@@ -34,4 +34,25 @@ func RedisInit() {
             return conn, err
         },
     }
+}
+
+
+func Insert(coon redis.Conn, key string, value interface{}) (reply interface{}, err error) {
+    reply, err = coon.Do("SET", key, value)
+    return reply, err
+}
+
+func Get(coon redis.Conn, key string, value interface{}) (reply interface{}, err error) {
+    reply, err = coon.Do("GET", key, value)
+    return reply, err
+}
+
+func Update(coon redis.Conn, key string, value interface{}) (reply interface{}, err error) {
+    reply, err = coon.Do("SET", key, value)
+    return reply, err
+}
+
+func Delete(coon redis.Conn, key string, value interface{}) (reply interface{}, err error) {
+    reply, err = coon.Do("DEL", key, value)
+    return reply, err
 }

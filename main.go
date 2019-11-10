@@ -1,7 +1,8 @@
 package main
 
 import (
-	"DosMq/db"
+	"DosMq/db/mongo"
+	"DosMq/db/redis"
 	"DosMq/router"
 	"DosMq/utils"
 	"flag"
@@ -17,9 +18,9 @@ func main() {
 	// log init
 	utils.LogInit()
 
-	// redis init
-	db.RedisInit()
-	//defer rCoon.Close()
+	// db init
+	redis.Init()
+	mongo.Init()
 
 	// load router
 	r := router.GetRouter()
