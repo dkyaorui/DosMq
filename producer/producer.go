@@ -2,6 +2,7 @@ package producer
 
 import (
     "DosMq/db/mongo"
+    mongoModule "DosMq/modules/mongo"
     "bufio"
     "bytes"
     "context"
@@ -16,13 +17,13 @@ import (
 )
 
 func Hello(c *gin.Context) {
-    var ans mongo.RequestMessage
+    var ans mongoModule.RequestMessage
     dataBase := mongo.GetMongoDataBase()
     collection := dataBase.Collection("recv_requests")
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
     objId, _ := primitive.ObjectIDFromHex("5dc90044f17b859e3bbd87f0")
-    err := collection.FindOne(ctx, bson.M{"_id":objId}).Decode(&ans)
+    err := collection.FindOne(ctx, bson.M{"_id": objId}).Decode(&ans)
     if err != nil {
         log.Error("find error")
         return
@@ -30,10 +31,10 @@ func Hello(c *gin.Context) {
     x, _ := http.ReadRequest(bufio.NewReader(bytes.NewReader(ans.RecvRequest)))
 
     reqUri := ""
-    if strings.HasPrefix(x.Proto, "HTTP") {
-        reqUri = "http://"+x.Host+x.RequestURI
-    }else{
-        reqUri = "https://"+x.Host+x.RequestURI
+    if strings.HasPrefix(x.Proto, "HTTPS") {
+        reqUri = "https://" + x.Host + x.RequestURI
+    } else {
+        reqUri = "http://" + x.Host + x.RequestURI
     }
 
     req, err := http.NewRequest(x.Method, reqUri, x.Body)
@@ -51,4 +52,8 @@ func Hello(c *gin.Context) {
     defer resp.Body.Close()
     fmt.Println("req", resp)
     c.JSON(http.StatusOK, ans)
+}
+
+func AddMethod(c *gin.Context) {
+
 }

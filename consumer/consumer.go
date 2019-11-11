@@ -2,6 +2,7 @@ package consumer
 
 import (
     "DosMq/db/mongo"
+    mongoModule "DosMq/modules/mongo"
     "context"
     "fmt"
     "github.com/gin-gonic/gin"
@@ -18,7 +19,7 @@ func Hello(c *gin.Context) {
         log.Errorf("%+v", err)
         return
     }
-    recvRequest := mongo.RequestMessage{
+    recvRequest := mongoModule.RequestMessage{
         RecvRequest: recvReq,
         Created:     time.Now(),
     }

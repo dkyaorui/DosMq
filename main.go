@@ -6,10 +6,16 @@ import (
 	"DosMq/router"
 	"DosMq/utils"
 	"flag"
+	"fmt"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 func main() {
+	// time init
+	loc, _ := time.LoadLocation("Asia/Chongqing")
+	fmt.Printf("时区: %s\n", loc)
+
 	// config init
 	configName := flag.String("configName", "config", "config file's name.")
 	configPath := flag.String("configPath", "./config", "config file's path.")
