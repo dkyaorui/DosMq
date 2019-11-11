@@ -3,5 +3,6 @@ package mongo
 import "time"
 
 type RequestMessage struct {
-    Created time.Time "created"
+    RecvRequest []byte `bson:"receive_request"`
+    Created time.Time `bson:"created"`
 }

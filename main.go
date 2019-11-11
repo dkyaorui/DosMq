@@ -24,7 +24,7 @@ func main() {
 
 	// load router
 	r := router.GetRouter()
-	log.Error("router loaded……")
+	log.Info("router loaded……")
 
 	// run server
 	if err := r.Run(":8080"); err != nil {
