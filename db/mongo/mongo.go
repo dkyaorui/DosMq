@@ -33,3 +33,7 @@ func Init() {
 func GetMongoDataBase() *mongo.Database {
     return database
 }
+
+func GetMongoCollection(collection string) *mongo.Collection {
+    return database.Collection(collection)
+}

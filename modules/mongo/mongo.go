@@ -12,11 +12,10 @@ type RequestMessage struct {
 
 // 主题
 type Topic struct {
-    Name       string       `bson:"name"`
-    Subscriber []Subscriber `bson:"subscriber"`
-    Owner      Owner        `bson:"owner"`
-    Target     string       `bson:"target"`
-    Type       bool         `bson:"type"`
+    Name               string       `bson:"name"`
+    Subscribers        []Subscriber `bson:"subscribers"`
+    Owner              Owner        `bson:"owner"`
+    ProcessMessageType string       `bson:"process_message_type"` // pull or push
 }
 
 // 消息
@@ -28,15 +27,17 @@ type Message struct {
 
 // 订阅者
 type Subscriber struct {
-    Name   string
-    Host   string
-    Key    string
-    Api    string
-    Method string
+    ServerName string `bson:"sub_server_name"`
+    Host       string `bson:"sub_Host"`
+    Key        string `bson:"sub_key"`
+    Api        string `bson:"sub_api"`
+    Method     string `bson:"sub_method"`
+    Protocol   string `bson:"sub_protocol"`
 }
 
 // 发布者
 type Owner struct {
-    Name string
-    Key  string
+    ServerName string `bson:"owner_server_name"`
+    Key        string `bson:"owner_key"` // 发布者上传key
+    Host       string `bson:"owner_host"`
 }

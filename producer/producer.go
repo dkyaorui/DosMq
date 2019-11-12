@@ -53,7 +53,3 @@ func Hello(c *gin.Context) {
     fmt.Println("req", resp)
     c.JSON(http.StatusOK, ans)
 }
-
-func AddMethod(c *gin.Context) {
-
-}
