@@ -38,7 +38,11 @@ func TopicRegister(c *gin.Context) {
         Owner:              owner,
         ProcessMessageType: processMessageType,
     }
-    collection := Mongodb.GetMongoCollection("topic")
+    mongoUtils := Mongodb.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    defer mongoUtils.CloseConn()
+    collection := mongoUtils.Database.Collection("topic")
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
     var result MongoModule.Topic

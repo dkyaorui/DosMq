@@ -12,5 +12,7 @@ redis:
 mongo:
   host: 127.0.0.1
   port: 27017
-  db: dosmq
+  db_name: dosmq
   user: root
+  auth: true
+  auth_source: admin

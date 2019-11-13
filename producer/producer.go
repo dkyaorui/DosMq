@@ -1,7 +1,7 @@
 package producer
 
 import (
-    "DosMq/db/mongo"
+    mongodb "DosMq/db/mongo"
     mongoModule "DosMq/modules/mongo"
     "bufio"
     "bytes"
@@ -18,8 +18,11 @@ import (
 
 func Hello(c *gin.Context) {
     var ans mongoModule.RequestMessage
-    dataBase := mongo.GetMongoDataBase()
-    collection := dataBase.Collection("recv_requests")
+    mongoUtils := mongodb.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    defer mongoUtils.CloseConn()
+    collection := mongoUtils.Database.Collection("recv_requests")
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
     objId, _ := primitive.ObjectIDFromHex("5dc90044f17b859e3bbd87f0")

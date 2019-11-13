@@ -1,7 +1,7 @@
 package consumer
 
 import (
-    "DosMq/db/mongo"
+    mongodb "DosMq/db/mongo"
     mongoModule "DosMq/modules/mongo"
     "context"
     "fmt"
@@ -24,9 +24,12 @@ func Hello(c *gin.Context) {
         Created:     time.Now(),
     }
     fmt.Printf(c.PostForm("name"))
+    mongoUtils := mongodb.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    defer mongoUtils.CloseConn()
 
-    database := mongo.GetMongoDataBase()
-    collection := database.Collection("recv_requests")
+    collection := mongoUtils.Database.Collection("recv_requests")
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
 
