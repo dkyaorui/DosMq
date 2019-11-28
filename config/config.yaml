@@ -10,9 +10,12 @@ redis:
   maxactive: 12
 
 mongo:
-  host: 127.0.0.1
+  host: www.moyee.club
   port: 27017
   db_name: dosmq
-  user: admin
+  user: moyee
   auth: true
-  auth_source: admin
+  auth_source: dosmq
+
+topic:
+  key: HelloWorld
