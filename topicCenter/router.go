@@ -11,5 +11,6 @@ func Routes(router *gin.Engine) {
     {
         topicRouter.POST("/sign_up", TopicRegister)
         topicRouter.POST("/del", TopicDel)
+        topicRouter.POST("/subscribe", SubscribeNews)
     }
 }

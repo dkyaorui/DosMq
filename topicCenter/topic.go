@@ -16,24 +16,21 @@ import (
 func TopicRegister(c *gin.Context) {
     var owner MongoModule.Owner
     var topic MongoModule.Topic
-    var requestResult utils.RequestResult
     var err error
     // check data
     if err = c.ShouldBindBodyWith(&owner, binding.JSON); err != nil {
         log.Infof("binding data error,struct:%s", "owner")
-        requestResult = utils.RequestResult{
+        c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
             Code: http.StatusPartialContent,
             Data: err.Error(),
-        }
-        c.AbortWithStatusJSON(http.StatusPartialContent, requestResult)
+        })
     }
     if err = c.ShouldBindBodyWith(&topic, binding.JSON); err != nil {
         log.Infof("binding data error,struct:%s", "topic")
-        requestResult = utils.RequestResult{
+        c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
             Code: http.StatusPartialContent,
             Data: err.Error(),
-        }
-        c.AbortWithStatusJSON(http.StatusPartialContent, requestResult)
+        })
     }
 
     // open mongo client
@@ -53,45 +50,49 @@ func TopicRegister(c *gin.Context) {
             Code: http.StatusBadGateway,
             Data: err.Error(),
         })
-    } else {
-        log.Infof("[insert]topic:%v", topic)
-        owner.TopicID = insertResult.InsertedID.(primitive.ObjectID)
-        topic.Owner = owner
-        _, err = mongoUtils.UpdateOne(
-            "topic",
-            bson.M{"_id": insertResult.InsertedID,},
-            bson.M{
-                "$set": bson.M{
-                    "owner": owner,
-                },
-            })
-        if err != nil {
-            log.Errorf("[update error] topic's _id:%s", insertResult.InsertedID)
-            _, _ = mongoUtils.DelOne("topic", bson.M{"_id": insertResult.InsertedID})
-            c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
-                Code: http.StatusBadGateway,
-                Data: err.Error(),
-            })
-        }
-        log.Infof("[update]topic:%v", topic)
-        byteOwner, _ := bson.Marshal(&owner)
-        _ = bson.Unmarshal(byteOwner, &doc)
-        _, err = mongoUtils.InsertOne("owner", doc)
-        if err != nil {
-            log.Infof("insert data error. data:%v", topic)
-            _, _ = mongoUtils.DelOne("topic", bson.M{"_id": insertResult.InsertedID})
-            c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
-                Code: http.StatusBadGateway,
-                Data: err.Error(),
-            })
-        }
-        log.Infof("[insert]owner:%v", owner)
+        return
     }
-    requestResult = utils.RequestResult{
+    log.Infof("[insert]topic:%v", topic)
+
+    owner.TopicID = insertResult.InsertedID.(primitive.ObjectID)
+    topic.Owner = owner
+    _, err = mongoUtils.UpdateOne(
+        "topic",
+        bson.M{"_id": insertResult.InsertedID,},
+        bson.M{
+            "$set": bson.M{
+                "owner": owner,
+            },
+        })
+    if err != nil {
+        log.Errorf("[update error] topic's _id:%s", insertResult.InsertedID)
+        _, _ = mongoUtils.DelOne("topic", bson.M{"_id": insertResult.InsertedID})
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    log.Infof("[update]topic:%v", topic)
+
+    byteOwner, _ := bson.Marshal(&owner)
+    _ = bson.Unmarshal(byteOwner, &doc)
+    _, err = mongoUtils.InsertOne("owner", doc)
+    if err != nil {
+        log.Infof("insert data error. data:%v", topic)
+        _, _ = mongoUtils.DelOne("topic", bson.M{"_id": insertResult.InsertedID})
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    log.Infof("[insert]owner:%v", owner)
+
+    c.JSON(http.StatusOK, utils.RequestResult{
         Code: http.StatusOK,
         Data: "register topic success",
-    }
-    c.JSON(http.StatusOK, requestResult)
+    })
 }
 
 /*
@@ -100,16 +101,13 @@ func TopicRegister(c *gin.Context) {
 */
 func TopicDel(c *gin.Context) {
     var owner MongoModule.Owner
-    //var topic MongoModule.Topic
-    var requestResult utils.RequestResult
     var err error
     if err = c.ShouldBindBodyWith(&owner, binding.JSON); err != nil {
         log.Infof("binding data error,struct:%s", "owner")
-        requestResult = utils.RequestResult{
+        c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
             Code: http.StatusPartialContent,
             Data: err.Error(),
-        }
-        c.AbortWithStatusJSON(http.StatusPartialContent, requestResult)
+        })
     }
     // open mongo client
     mongoUtils := Mongodb.Utils
@@ -137,7 +135,6 @@ func TopicDel(c *gin.Context) {
         })
         return
     }
-    log.Infof("topic id:%v", owner.TopicID)
     // del subscriber
     delResult, err := mongoUtils.DelMany("subscriber", bson.M{"topic_id": owner.TopicID,})
     if err != nil {
@@ -175,5 +172,110 @@ func TopicDel(c *gin.Context) {
     c.JSON(http.StatusOK, utils.RequestResult{
         Code: http.StatusOK,
         Data: "del success",
+    })
+}
+
+func SubscribeNews(c *gin.Context) {
+    var owner MongoModule.Owner
+    var subscriber MongoModule.Subscriber
+    var topic MongoModule.Topic
+    var err error
+
+    if err = c.ShouldBindBodyWith(&owner, binding.JSON); err != nil {
+        log.Infof("binding data error,struct:%s", "owner")
+        c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
+            Code: http.StatusPartialContent,
+            Data: err.Error(),
+        })
+    }
+    if err = c.ShouldBindBodyWith(&subscriber, binding.JSON); err != nil {
+        log.Infof("binding data error,struct:%s", "subscriber")
+        c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
+            Code: http.StatusPartialContent,
+            Data: err.Error(),
+        })
+    }
+    // open mongo client
+    mongoUtils := Mongodb.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    defer mongoUtils.CloseConn()
+    fmt.Println("del topic")
+    // main
+    spc := bson.M{}
+    byteOwner, _ := bson.Marshal(&owner)
+    _ = bson.Unmarshal(byteOwner, &spc)
+    findResult, err := mongoUtils.FindOne("owner", spc)
+    if err != nil {
+        log.Errorf("[find error] owner:%v", owner)
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    if err = findResult.Decode(&owner); err != nil {
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    log.Infof("topic id:%v", owner.TopicID)
+
+    subscriber.TopicId = owner.TopicID
+
+    findResult, err = mongoUtils.FindOne("topic", bson.M{"_id": owner.TopicID,})
+    if err != nil {
+        log.Errorf("[find error] owner:%v", owner)
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    if err = findResult.Decode(&topic); err != nil {
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    if topic.Subscribers == nil {
+        topic.Subscribers = []MongoModule.Subscriber{subscriber}
+    } else {
+        topic.Subscribers = append(topic.Subscribers, subscriber)
+    }
+    _, err = mongoUtils.UpdateOne(
+        "topic",
+        bson.M{"_id": topic.Id,},
+        bson.M{
+            "$set": bson.M{
+                "subscribers": topic.Subscribers,
+            },
+        })
+    if err != nil {
+        log.Errorf("[update error] topic's _id:%s", topic.Id)
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    doc := bson.M{}
+    byteSubscriber, _ := bson.Marshal(subscriber)
+    _ = bson.Unmarshal(byteSubscriber, &doc)
+    _, err = mongoUtils.InsertOne("subscriber", doc)
+    if err != nil {
+        log.Infof("[insert error]data: %v", subscriber)
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    c.JSON(http.StatusOK, utils.RequestResult{
+        Code: http.StatusOK,
+        Data: "subscribe success",
     })
 }

@@ -28,6 +28,7 @@ type Topic struct {
     ProcessMessageType string             `bson:"process_message_type" json:"topic_process_type" binding:"required"` // pull or push
     Subscribers        []Subscriber       `bson:"subscribers" json:"topic_subscribers" binding:"-"`
     Owner              Owner              `bson:"owner" json:"topic_owner" binding:"-"`
+    HashCode           string             `bson:"hash_code" json:"hash_code" binding:"-"`
 }
 
 // 消息
@@ -35,6 +36,7 @@ type Message struct {
     TopicId   primitive.ObjectID `bson:"topic_id" json:"topic_id" binding:"-"`
     Value     []byte             `bson:"value" json:"value" binding:"required"`
     Timestamp int64              `bson:"create_time" json:"timestamp" binding:"-"`
+    HashCode           string             `bson:"hash_code" json:"hash_code" binding:"-"`
 }
 
 // 订阅者
@@ -46,6 +48,7 @@ type Subscriber struct {
     Api        string             `bson:"sub_api" json:"sub_api" binding:"required"`
     Method     string             `bson:"sub_method" json:"sub_method" binding:"required"`
     TopicId    primitive.ObjectID `bson:"topic_id" json:"sub_topic_id" binding:"-"`
+    HashCode           string             `bson:"hash_code" json:"hash_code" binding:"-"`
 }
 
 // 发布者
@@ -55,4 +58,5 @@ type Owner struct {
     Key        string             `bson:"owner_key" json:"owner_key" binding:"required"` // 发布者上传key
     Host       string             `bson:"owner_host" json:"owner_host" binding:"required"`
     TopicID    primitive.ObjectID `bson:"topic_id" json:"owner_topic_id" binding:"-"`
+    HashCode           string             `bson:"hash_code" json:"hash_code" binding:"-"`
 }

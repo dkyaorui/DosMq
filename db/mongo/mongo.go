@@ -10,7 +10,6 @@ import (
     "go.mongodb.org/mongo-driver/mongo/options"
     "go.mongodb.org/mongo-driver/mongo/readpref"
     "net/url"
-    "os"
     "time"
 )
 
@@ -38,7 +37,7 @@ func Init() {
         Port:       mongoConfig["port"].(int),
         isAuth:     mongoConfig["auth"].(bool),
         user:       mongoConfig["user"].(string),
-        password:   os.Getenv("MONGO_PASSWORD"),
+        password:   viper.GetString("mongoPassword"),
         authSource: mongoConfig["auth_source"].(string),
     }
     Utils.OpenConn()
