@@ -58,7 +58,7 @@ func (m *DbMongoUtils) Bson2Obj(val interface{}, obj interface{}) error {
     return nil
 }
 
-func getCtx() (context.Context, context.CancelFunc) {
+func GetCtx() (context.Context, context.CancelFunc) {
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     return ctx, cancel
 }
@@ -88,7 +88,6 @@ func (m *DbMongoUtils) OpenConn() {
         panic(err)
         return
     }
-    fmt.Println("connect success")
     m.Client = client
 }
 
@@ -108,18 +107,19 @@ func (m *DbMongoUtils) SetDB(db string) {
     m.Database = m.Client.Database(db)
 }
 
-func (m *DbMongoUtils) FindOne(col string, spc bson.M) (bson.M, error) {
+func (m *DbMongoUtils) FindOne(col string, spc bson.M) (*mongo.SingleResult, error) {
     if m.Database == nil || m.Client == nil {
         return nil, fmt.Errorf("there is no database or client")
     }
-    var result bson.M
     table := m.Database.Collection(col)
-    ctx, cancel := getCtx()
+    ctx, cancel := GetCtx()
     defer cancel()
-    if err := table.FindOne(ctx, spc).Decode(&result); err != nil {
-        return nil, err
+    findResult := table.FindOne(ctx, spc)
+    if findResult.Err() != nil {
+        return nil, findResult.Err()
     }
-    return result, nil
+
+    return findResult, nil
 }
 
 func (m *DbMongoUtils) FindMore(col string, spc bson.M) ([]bson.M, error) {
@@ -127,7 +127,7 @@ func (m *DbMongoUtils) FindMore(col string, spc bson.M) ([]bson.M, error) {
         return nil, fmt.Errorf("there is no database or client")
     }
     table := m.Database.Collection(col)
-    ctx, cancel := getCtx()
+    ctx, cancel := GetCtx()
     defer cancel()
     cur, err := table.Find(ctx, spc)
     if err != nil {
@@ -145,24 +145,60 @@ func (m *DbMongoUtils) FindMore(col string, spc bson.M) ([]bson.M, error) {
     return resultArray, nil
 }
 
-func (m *DbMongoUtils) InsertOne(col string, spc bson.M) (bson.M, error) {
-    return nil, nil
+func (m *DbMongoUtils) InsertOne(col string, document bson.M) (result *mongo.InsertOneResult, err error) {
+    if m.Database == nil || m.Client == nil {
+        return nil, fmt.Errorf("there is no database or client")
+    }
+    table := m.Database.Collection(col)
+    ctx, cancel := GetCtx()
+    defer cancel()
+    if result, err = table.InsertOne(ctx, document); err != nil {
+        return nil, err
+    }
+    return result, nil
 }
 
 func (m *DbMongoUtils) InsertMany(col string, spc bson.M) ([]bson.M, error) {
     return nil, nil
 }
 
-func (m *DbMongoUtils) DelOne(col string, spc bson.M) (bson.M, error) {
-    return nil, nil
+func (m *DbMongoUtils) DelOne(col string, spc bson.M) (result *mongo.DeleteResult, err error) {
+    if m.Database == nil || m.Client == nil {
+        return nil, fmt.Errorf("there is no database or client")
+    }
+    table := m.Database.Collection(col)
+    ctx, cancel := GetCtx()
+    defer cancel()
+    if result, err = table.DeleteOne(ctx, spc); err != nil {
+        return nil, err
+    }
+    return result, nil
 }
 
-func (m *DbMongoUtils) DelMany(col string, spc bson.M) ([]bson.M, error) {
-    return nil, nil
+func (m *DbMongoUtils) DelMany(col string, spc bson.M) (result *mongo.DeleteResult, err error) {
+    if m.Database == nil || m.Client == nil {
+        return nil, fmt.Errorf("there is no database or client")
+    }
+    table := m.Database.Collection(col)
+    ctx, cancel := GetCtx()
+    defer cancel()
+    if result, err = table.DeleteMany(ctx, spc); err != nil {
+        return nil, err
+    }
+    return result, nil
 }
 
-func (m *DbMongoUtils) UpdateOne(col string, spc bson.M) (bson.M, error) {
-    return nil, nil
+func (m *DbMongoUtils) UpdateOne(col string, spc bson.M, doc bson.M) (result *mongo.UpdateResult, err error) {
+    if m.Database == nil || m.Client == nil {
+        return nil, fmt.Errorf("there is no database or client")
+    }
+    table := m.Database.Collection(col)
+    ctx, cancel := GetCtx()
+    defer cancel()
+    if result, err = table.UpdateOne(ctx, spc, doc); err != nil {
+        return nil, err
+    }
+    return result, nil
 }
 
 func (m *DbMongoUtils) UpdateMany(col string, spc bson.M) ([]bson.M, error) {

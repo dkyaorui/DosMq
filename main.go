@@ -1,5 +1,15 @@
 /*
 The data type of all requests is json, and you need set the headers with "application/json"
+
+The data type of all response is json.
+eg:
+{
+    "Code": 200,
+    "Data": {
+        "Code": 200,
+        "Data": "msg"
+    }
+}
 */
 
 package main

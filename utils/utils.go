@@ -1,7 +1,7 @@
 package utils
 
 import (
-    "github.com/pkg/errors"
+    "fmt"
     "github.com/spf13/viper"
 )
 
@@ -13,7 +13,7 @@ type RequestResult struct {
 
 func CheckRegisterTopicKey(key string) (err error) {
     if key != viper.Get("topic.key") {
-        return errors.Wrap(err, "the key with register topic is wrong")
+        return fmt.Errorf("the key with register topic is wrong")
     }
     return nil
 }
