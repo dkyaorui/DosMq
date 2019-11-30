@@ -40,6 +40,25 @@ func TopicRegister(c *gin.Context) {
     defer mongoUtils.CloseConn()
 
     // curd
+    topic.HashCode = topic.GetHashCode()
+    topic.Id = primitive.NewObjectID()
+    // check is data repeat
+    var isRepeat bool
+    if isRepeat, err = topic.CheckIsRepeat(&mongoUtils); err != nil {
+        log.Error(err)
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    if isRepeat {
+        c.AbortWithStatusJSON(http.StatusCreated, utils.RequestResult{
+            Code: http.StatusCreated,
+            Data: "topic is repeat",
+        })
+        return
+    }
     byteTopic, _ := bson.Marshal(&topic)
     doc := bson.M{}
     _ = bson.Unmarshal(byteTopic, &doc)
@@ -55,6 +74,8 @@ func TopicRegister(c *gin.Context) {
     log.Infof("[insert]topic:%v", topic)
 
     owner.TopicID = insertResult.InsertedID.(primitive.ObjectID)
+    owner.Id = primitive.NewObjectID()
+    owner.HashCode = owner.GetHashCode()
     topic.Owner = owner
     _, err = mongoUtils.UpdateOne(
         "topic",
@@ -74,7 +95,20 @@ func TopicRegister(c *gin.Context) {
         return
     }
     log.Infof("[update]topic:%v", topic)
-
+    if isRepeat, err = owner.CheckIsRepeat(&mongoUtils); err != nil {
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    if isRepeat {
+        c.AbortWithStatusJSON(http.StatusCreated, utils.RequestResult{
+            Code: http.StatusCreated,
+            Data: "owner is repeat",
+        })
+        return
+    }
     byteOwner, _ := bson.Marshal(&owner)
     _ = bson.Unmarshal(byteOwner, &doc)
     _, err = mongoUtils.InsertOne("owner", doc)
@@ -224,6 +258,23 @@ func SubscribeNews(c *gin.Context) {
     log.Infof("topic id:%v", owner.TopicID)
 
     subscriber.TopicId = owner.TopicID
+    subscriber.HashCode = subscriber.GetHashCode()
+
+    var isRepeat bool
+    if isRepeat, err = subscriber.CheckIsRepeat(&mongoUtils); err != nil {
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    if isRepeat {
+        c.AbortWithStatusJSON(http.StatusCreated, utils.RequestResult{
+            Code: http.StatusCreated,
+            Data: "subscriber is repeat",
+        })
+        return
+    }
 
     findResult, err = mongoUtils.FindOne("topic", bson.M{"_id": owner.TopicID,})
     if err != nil {

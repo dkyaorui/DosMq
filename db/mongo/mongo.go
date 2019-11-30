@@ -3,6 +3,7 @@ package mongo
 import (
     "context"
     "fmt"
+    "github.com/pkg/errors"
     log "github.com/sirupsen/logrus"
     "github.com/spf13/viper"
     "go.mongodb.org/mongo-driver/bson"
@@ -108,14 +109,14 @@ func (m *DbMongoUtils) SetDB(db string) {
 
 func (m *DbMongoUtils) FindOne(col string, spc bson.M) (*mongo.SingleResult, error) {
     if m.Database == nil || m.Client == nil {
-        return nil, fmt.Errorf("there is no database or client")
+        return nil, errors.New("there is no database or client")
     }
     table := m.Database.Collection(col)
     ctx, cancel := GetCtx()
     defer cancel()
     findResult := table.FindOne(ctx, spc)
     if findResult.Err() != nil {
-        return nil, findResult.Err()
+        return nil, errors.WithMessage(findResult.Err(),"[find error] db error")
     }
 
     return findResult, nil
