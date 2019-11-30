@@ -166,10 +166,10 @@ func (t *Topic) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": t.HashCode}
     findResult, err := mongoUtils.FindOne("topic", spc)
     if err != nil {
-        if strings.Contains(err.Error(), "no documents in result"){
-           return false, nil
+        if strings.Contains(err.Error(), "no documents in result") {
+            return false, nil
         }
-        return true, errors.Wrap(err,"no data")
+        return true, errors.Wrap(err, "no data")
     }
     var topic Topic
     if err = findResult.Decode(&topic); err != nil {
@@ -184,10 +184,10 @@ func (m *Message) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) 
     spc := bson.M{"hash_code": m.HashCode}
     findResult, err := mongoUtils.FindOne("message", spc)
     if err != nil {
-        if strings.Contains(err.Error(), "no documents in result"){
+        if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
         }
-        return true, errors.Wrap(err,"no data")
+        return true, errors.Wrap(err, "no data")
     }
     var message Message
     if err = findResult.Decode(&message); err != nil {
@@ -203,10 +203,10 @@ func (s *Subscriber) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, erro
     spc := bson.M{"hash_code": s.HashCode}
     findResult, err := mongoUtils.FindOne("subscriber", spc)
     if err != nil {
-        if strings.Contains(err.Error(), "no documents in result"){
+        if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
         }
-        return true, errors.Wrap(err,"no data")
+        return true, errors.Wrap(err, "no data")
     }
     var subscriber Subscriber
     if err = findResult.Decode(&subscriber); err != nil {
@@ -221,10 +221,10 @@ func (o *Owner) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": o.HashCode}
     findResult, err := mongoUtils.FindOne("owner", spc)
     if err != nil {
-        if strings.Contains(err.Error(), "no documents in result"){
+        if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
         }
-        return true, errors.Wrap(err,"no data")
+        return true, errors.Wrap(err, "no data")
     }
     var owner Owner
     if err = findResult.Decode(&owner); err != nil {

@@ -42,6 +42,10 @@ func TopicRegister(c *gin.Context) {
     // curd
     topic.HashCode = topic.GetHashCode()
     topic.Id = primitive.NewObjectID()
+    owner.TopicID = topic.Id
+    owner.Id = primitive.NewObjectID()
+    owner.HashCode = owner.GetHashCode()
+    topic.Owner = owner
     // check is data repeat
     var isRepeat bool
     if isRepeat, err = topic.CheckIsRepeat(&mongoUtils); err != nil {
@@ -62,7 +66,7 @@ func TopicRegister(c *gin.Context) {
     byteTopic, _ := bson.Marshal(&topic)
     doc := bson.M{}
     _ = bson.Unmarshal(byteTopic, &doc)
-    insertResult, err := mongoUtils.InsertOne("topic", doc)
+    _, err = mongoUtils.InsertOne("topic", doc)
     if err != nil {
         log.Infof("insert data error. data:%v", topic)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -73,28 +77,6 @@ func TopicRegister(c *gin.Context) {
     }
     log.Infof("[insert]topic:%v", topic)
 
-    owner.TopicID = insertResult.InsertedID.(primitive.ObjectID)
-    owner.Id = primitive.NewObjectID()
-    owner.HashCode = owner.GetHashCode()
-    topic.Owner = owner
-    _, err = mongoUtils.UpdateOne(
-        "topic",
-        bson.M{"_id": insertResult.InsertedID,},
-        bson.M{
-            "$set": bson.M{
-                "owner": owner,
-            },
-        })
-    if err != nil {
-        log.Errorf("[update error] topic's _id:%s", insertResult.InsertedID)
-        _, _ = mongoUtils.DelOne("topic", bson.M{"_id": insertResult.InsertedID})
-        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
-            Code: http.StatusBadGateway,
-            Data: err.Error(),
-        })
-        return
-    }
-    log.Infof("[update]topic:%v", topic)
     if isRepeat, err = owner.CheckIsRepeat(&mongoUtils); err != nil {
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
@@ -114,7 +96,7 @@ func TopicRegister(c *gin.Context) {
     _, err = mongoUtils.InsertOne("owner", doc)
     if err != nil {
         log.Infof("insert data error. data:%v", topic)
-        _, _ = mongoUtils.DelOne("topic", bson.M{"_id": insertResult.InsertedID})
+        _, _ = mongoUtils.DelOne("topic", bson.M{"_id": owner.Id})
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
             Data: err.Error(),

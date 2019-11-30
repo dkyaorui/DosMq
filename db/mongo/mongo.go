@@ -116,7 +116,7 @@ func (m *DbMongoUtils) FindOne(col string, spc bson.M) (*mongo.SingleResult, err
     defer cancel()
     findResult := table.FindOne(ctx, spc)
     if findResult.Err() != nil {
-        return nil, errors.WithMessage(findResult.Err(),"[find error] db error")
+        return nil, errors.WithMessage(findResult.Err(), "[find error] db error")
     }
 
     return findResult, nil
