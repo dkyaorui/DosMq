@@ -4,6 +4,7 @@ import (
     myMongo "DosMq/db/mongo"
     "bytes"
     "crypto/md5"
+    "fmt"
     "github.com/pkg/errors"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/bson/primitive"
@@ -11,8 +12,16 @@ import (
     "time"
 )
 
+const (
+    DB_SUBSCRIBER = "subscriber"
+    DB_TOPIC      = "topic"
+    DB_OWNER      = "owner"
+    DB_MESSAGE    = "message"
+)
+
 type ModuleUtils interface {
     GetHashCode() []byte
+    // 如果不存在重复返回 false
     CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error)
 }
 
@@ -95,14 +104,14 @@ func (m *Message) GetHashCode() []byte {
 func (s *Subscriber) GetHashCode() []byte {
     // hash_code = server_name + host + key + api + method
     hashCode := md5.Sum([]byte(s.ServerName + s.Host + s.Key + s.Api + s.Method))
+    fmt.Print(hashCode)
     return hashCode[:]
 }
 
 func (o *Owner) GetHashCode() []byte {
-    // hash_code = host + key + ServerName + topic_id
+    // hash_code = host + key + ServerName
     var buffer bytes.Buffer
     buffer.Write([]byte(o.Host + o.Key + o.ServerName))
-    buffer.Write(o.TopicID[:])
     hashCode := md5.Sum(buffer.Bytes())
     return hashCode[:]
 }
@@ -152,8 +161,7 @@ func (o *Owner) Equal(target Owner) bool {
     if bytes.Compare(o.HashCode, target.HashCode) == 0 {
         if strings.Compare(o.Host, target.Host) == 0 &&
             strings.Compare(o.Key, target.Key) == 0 &&
-            strings.Compare(o.ServerName, target.ServerName) == 0 &&
-            bytes.Compare(o.TopicID[:], target.TopicID[:]) == 0 {
+            strings.Compare(o.ServerName, target.ServerName) == 0 {
             return true
         }
         return false
@@ -164,7 +172,7 @@ func (o *Owner) Equal(target Owner) bool {
 
 func (t *Topic) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": t.HashCode}
-    findResult, err := mongoUtils.FindOne("topic", spc)
+    findResult, err := mongoUtils.FindOne(DB_TOPIC, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -182,7 +190,7 @@ func (t *Topic) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 }
 func (m *Message) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": m.HashCode}
-    findResult, err := mongoUtils.FindOne("message", spc)
+    findResult, err := mongoUtils.FindOne(DB_MESSAGE, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -201,7 +209,7 @@ func (m *Message) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) 
 
 func (s *Subscriber) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": s.HashCode}
-    findResult, err := mongoUtils.FindOne("subscriber", spc)
+    findResult, err := mongoUtils.FindOne(DB_SUBSCRIBER, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -219,7 +227,7 @@ func (s *Subscriber) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, erro
 }
 func (o *Owner) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": o.HashCode}
-    findResult, err := mongoUtils.FindOne("owner", spc)
+    findResult, err := mongoUtils.FindOne(DB_OWNER, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -234,4 +242,20 @@ func (o *Owner) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
         return true, nil
     }
     return false, nil
+}
+
+func (t *Topic) FindIndexInSubscribers(target Subscriber) int {
+    for index, sub := range t.Subscribers {
+        if bytes.Compare(sub.HashCode, target.HashCode) == 0 {
+            return index
+        }
+    }
+    return -1
+}
+
+func (t *Topic) DelSubscribe(target Subscriber) {
+    subIndex := t.FindIndexInSubscribers(target)
+    if subIndex != -1 {
+        t.Subscribers = append(t.Subscribers[:subIndex], t.Subscribers[subIndex+1:]...)
+    }
 }
