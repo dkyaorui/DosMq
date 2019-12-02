@@ -3,7 +3,7 @@ log:
   name: "DosMq.log"
 
 redis:
-  host: 127.0.0.1
+  host: www.moyee.club
   port: 6379
   db: 1
   maxidle: 2

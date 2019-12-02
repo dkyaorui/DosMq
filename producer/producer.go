@@ -1,58 +1,68 @@
 package producer
 
 import (
-    mongodb "DosMq/db/mongo"
-    mongoModule "DosMq/modules/mongo"
-    "bufio"
-    "bytes"
-    "context"
+    Mongodb "DosMq/db/mongo"
+    myRedis "DosMq/db/redis"
+    MongoModule "DosMq/modules/mongo"
+    "DosMq/utils"
     "fmt"
     "github.com/gin-gonic/gin"
+    "github.com/gin-gonic/gin/binding"
     log "github.com/sirupsen/logrus"
     "go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/bson/primitive"
     "net/http"
-    "strings"
     "time"
 )
 
-func Hello(c *gin.Context) {
-    var ans mongoModule.RequestMessage
-    mongoUtils := mongodb.Utils
+func SendHandler(c *gin.Context) {
+    var owner MongoModule.Owner
+    var message MongoModule.Message
+    var err error
+    if err = c.ShouldBindBodyWith(&owner, binding.JSON); err != nil {
+        log.Infof("binding data error,struct:%s", "owner")
+        c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
+            Code: http.StatusPartialContent,
+            Data: err.Error(),
+        })
+        return
+    }
+    messageValue := c.PostForm("value")
+    fmt.Println(messageValue)
+    if err = c.ShouldBindBodyWith(&message, binding.JSON); err != nil {
+        log.Infof("binding data error,struct:%s", "message")
+        c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
+            Code: http.StatusPartialContent,
+            Data: err.Error(),
+        })
+        return
+    }
+
+    mongoUtils := Mongodb.Utils
     mongoUtils.OpenConn()
     mongoUtils.SetDB(mongoUtils.DBName)
     defer mongoUtils.CloseConn()
-    collection := mongoUtils.Database.Collection("recv_requests")
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
-    objId, _ := primitive.ObjectIDFromHex("5dc90044f17b859e3bbd87f0")
-    err := collection.FindOne(ctx, bson.M{"_id": objId}).Decode(&ans)
+
+    owner.HashCode = owner.GetHashCode()
+    findResult, err := mongoUtils.FindOne(MongoModule.DB_OWNER, bson.M{"hash_code": owner.HashCode})
     if err != nil {
-        log.Error("find error")
+        log.Errorf("[find error] owner:%v", owner)
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
         return
     }
-    x, _ := http.ReadRequest(bufio.NewReader(bytes.NewReader(ans.RecvRequest)))
-
-    reqUri := ""
-    if strings.HasPrefix(x.Proto, "HTTPS") {
-        reqUri = "https://" + x.Host + x.RequestURI
-    } else {
-        reqUri = "http://" + x.Host + x.RequestURI
-    }
-
-    req, err := http.NewRequest(x.Method, reqUri, x.Body)
-
-    if err != nil {
-        log.Error(err)
+    if err = findResult.Decode(&owner); err != nil {
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
         return
     }
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        log.Error(err)
-        return
-    }
-    defer resp.Body.Close()
-    fmt.Println("req", resp)
-    c.JSON(http.StatusOK, ans)
+
+    message.TopicId = owner.TopicID
+    message.Timestamp = time.Now().UnixNano()
+    message.HashCode = message.GetHashCode()
+    //myRedis.RDbClient
+
 }

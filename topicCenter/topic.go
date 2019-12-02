@@ -12,7 +12,7 @@ import (
     "net/http"
 )
 
-func TopicRegister(c *gin.Context) {
+func TopicRegisterHandler(c *gin.Context) {
     var owner MongoModule.Owner
     var topic MongoModule.Topic
     var err error
@@ -23,6 +23,7 @@ func TopicRegister(c *gin.Context) {
             Code: http.StatusPartialContent,
             Data: err.Error(),
         })
+        return
     }
     if err = c.ShouldBindBodyWith(&topic, binding.JSON); err != nil {
         log.Infof("binding data error,struct:%s", "topic")
@@ -30,6 +31,7 @@ func TopicRegister(c *gin.Context) {
             Code: http.StatusPartialContent,
             Data: err.Error(),
         })
+        return
     }
 
     // open mongo client
@@ -115,7 +117,7 @@ func TopicRegister(c *gin.Context) {
    receive the owner info(key, server_name, host), then find the topic_id.
    Before delete the topic, we need del the subscribers first.
 */
-func TopicDel(c *gin.Context) {
+func TopicDelHandler(c *gin.Context) {
     var owner MongoModule.Owner
     var err error
     if err = c.ShouldBindBodyWith(&owner, binding.JSON); err != nil {
@@ -190,7 +192,7 @@ func TopicDel(c *gin.Context) {
     })
 }
 
-func SubscribeNews(c *gin.Context) {
+func SubscribeNewsHandler(c *gin.Context) {
     var owner MongoModule.Owner
     var subscriber MongoModule.Subscriber
     var topic MongoModule.Topic
@@ -273,6 +275,7 @@ func SubscribeNews(c *gin.Context) {
         })
         return
     }
+    // update topic's subscribers
     if topic.Subscribers == nil {
         topic.Subscribers = []MongoModule.Subscriber{subscriber}
     } else {
@@ -313,7 +316,7 @@ func SubscribeNews(c *gin.Context) {
     })
 }
 
-func CancelSubscribe(c *gin.Context) {
+func CancelSubscribeHandler(c *gin.Context) {
     var subscribe MongoModule.Subscriber
     var err error
 
