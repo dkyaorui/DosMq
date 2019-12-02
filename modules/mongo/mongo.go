@@ -4,6 +4,7 @@ import (
     myMongo "DosMq/db/mongo"
     "bytes"
     "crypto/md5"
+    "encoding/hex"
     "fmt"
     "github.com/pkg/errors"
     "go.mongodb.org/mongo-driver/bson"
@@ -21,7 +22,8 @@ const (
 
 type ModuleUtils interface {
     GetHashCode() []byte
-    // 如果不存在重复返回 false
+    GetRedisKey() string
+    // if not exist false
     CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error)
 }
 
@@ -57,7 +59,7 @@ type Topic struct {
 // collection_name: message
 type Message struct {
     TopicId   primitive.ObjectID `bson:"topic_id" json:"topic_id" binding:"-"`
-    Value     []byte             `bson:"value" json:"value" binding:"required"`
+    Value     string             `bson:"value" json:"value" binding:"required"`
     Timestamp int64              `bson:"create_time" json:"timestamp" binding:"-"`
     HashCode  []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
 }
@@ -96,7 +98,7 @@ func (m *Message) GetHashCode() []byte {
     // hash_code = topicA_id + value
     var buffer bytes.Buffer
     buffer.Write(m.TopicId[:])
-    buffer.Write(m.Value)
+    buffer.Write([]byte(m.Value))
     hashCode := md5.Sum(buffer.Bytes())
     return hashCode[:]
 }
@@ -133,7 +135,7 @@ func (t *Topic) Equal(target Topic) bool {
 func (m *Message) Equal(target Message) bool {
     if bytes.Compare(m.HashCode, target.HashCode) == 0 {
         if bytes.Compare(m.TopicId[:], target.TopicId[:]) == 0 &&
-            bytes.Compare(m.Value, target.Value) == 0 {
+            strings.Compare(m.Value, target.Value) == 0 {
             return true
         }
         return false
@@ -258,4 +260,20 @@ func (t *Topic) DelSubscribe(target Subscriber) {
     if subIndex != -1 {
         t.Subscribers = append(t.Subscribers[:subIndex], t.Subscribers[subIndex+1:]...)
     }
+}
+
+func (t *Topic) GetRedisKey() string {
+    return "topic_" + hex.EncodeToString(t.HashCode)
+}
+
+func (m *Message) GetRedisKey() string {
+    return "message_" + hex.EncodeToString(m.TopicId[:])
+}
+
+func (s *Subscriber) GetRedisKey() string {
+    return "subscriber_" + hex.EncodeToString(s.HashCode)
+}
+
+func (o *Owner) GetRedisKey() string {
+    return "owner_" + hex.EncodeToString(o.HashCode)
 }
