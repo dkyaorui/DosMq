@@ -11,7 +11,7 @@ import (
     "time"
 )
 
-var RDbClient *RDbPool
+var RDbClient RDbPool
 
 type RDbPool struct {
     pool *redis.Pool

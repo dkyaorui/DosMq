@@ -55,9 +55,18 @@ type Topic struct {
     HashCode           []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
 }
 
-// 消息
-// collection_name: message
+/*
+消息
+collection_name: message
+
+push the message to their topic's message queue.If the queue is full,
+save the message into redis.
+
+when consumer use the message,query in redis first and if no data in redis then
+get message in queue.when the message is used then save it in mongodb.
+*/
 type Message struct {
+    Id        primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
     TopicId   primitive.ObjectID `bson:"topic_id" json:"topic_id" binding:"-"`
     Value     string             `bson:"value" json:"value" binding:"required"`
     Timestamp int64              `bson:"create_time" json:"timestamp" binding:"-"`
@@ -267,7 +276,7 @@ func (t *Topic) GetRedisKey() string {
 }
 
 func (m *Message) GetRedisKey() string {
-    return "message_" + hex.EncodeToString(m.TopicId[:])
+    return "message_item_" + hex.EncodeToString(m.Id[:])
 }
 
 func (s *Subscriber) GetRedisKey() string {
@@ -276,4 +285,8 @@ func (s *Subscriber) GetRedisKey() string {
 
 func (o *Owner) GetRedisKey() string {
     return "owner_" + hex.EncodeToString(o.HashCode)
+}
+
+func (m *Message) GetMqKey() string {
+    return "message_" + hex.EncodeToString(m.TopicId[:])
 }

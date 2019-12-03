@@ -5,11 +5,12 @@ import (
     myRedis "DosMq/db/redis"
     MongoModule "DosMq/modules/mongo"
     "DosMq/utils"
-    "fmt"
     "github.com/gin-gonic/gin"
     "github.com/gin-gonic/gin/binding"
+    "github.com/pkg/errors"
     log "github.com/sirupsen/logrus"
     "go.mongodb.org/mongo-driver/bson"
+    "go.mongodb.org/mongo-driver/bson/primitive"
     "net/http"
     "time"
 )
@@ -26,8 +27,6 @@ func SendHandler(c *gin.Context) {
         })
         return
     }
-    messageValue := c.PostForm("value")
-    fmt.Println(messageValue)
     if err = c.ShouldBindBodyWith(&message, binding.JSON); err != nil {
         log.Infof("binding data error,struct:%s", "message")
         c.AbortWithStatusJSON(http.StatusPartialContent, utils.RequestResult{
@@ -60,9 +59,40 @@ func SendHandler(c *gin.Context) {
         return
     }
 
+    message.Id = primitive.NewObjectID()
     message.TopicId = owner.TopicID
     message.Timestamp = time.Now().UnixNano()
     message.HashCode = message.GetHashCode()
-    //myRedis.RDbClient
 
+    redisClient := &myRedis.RDbClient
+    isExists, err := redisClient.Exists(message.GetRedisKey())
+    if err != nil {
+        log.Errorf("[find error]:%+v", errors.WithMessage(err, "redis error"))
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    if isExists {
+        c.AbortWithStatusJSON(http.StatusAlreadyReported, utils.RequestResult{
+            Code: http.StatusAlreadyReported,
+            Data: "the message had been send",
+        })
+        return
+    }
+    err = redisClient.Set(message.GetRedisKey(), message, 0)
+    if err != nil {
+        log.Errorf("[set error]:%+v", errors.WithMessage(err, "redis error"))
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, utils.RequestResult{
+        Code: http.StatusOK,
+        Data: "the message has send",
+    })
 }

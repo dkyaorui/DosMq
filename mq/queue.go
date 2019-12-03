@@ -3,7 +3,7 @@
 项目地址：https://github.com/dkyaorui/LFQueue
 */
 
-package LFQueue
+package mq
 
 import (
 	"reflect"
