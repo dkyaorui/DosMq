@@ -70,37 +70,80 @@ func (p *RDbPool) decode(reply interface{}, err error, val interface{}) error {
     return json.Unmarshal([]byte(str), val)
 }
 
-func (p *RDbPool) Insert(key string, value interface{}) (reply interface{}, err error) {
-    reply, err = p.Do("SET", key, value)
-    return reply, err
+func (p *RDbPool) getKey(key string) string {
+    return "mq_" + key
+}
+
+func (p *RDbPool) Expire(key string, expire int64) error {
+    _, err := redis.Bool(p.Do("EXPIRE", p.getKey(key), expire))
+    return err
+}
+
+func (p *RDbPool) TTL(key string) (ttl int64, err error) {
+    return redis.Int64(p.Do("TTL", p.getKey(key)))
+}
+
+func (p *RDbPool) Exists(key string) (bool, error) {
+    return redis.Bool(p.Do("EXISTS", p.getKey(key)))
+}
+
+func (p *RDbPool) Set(key string, value interface{}, expire int64) (err error) {
+    val, err := p.encode(value)
+    if err != nil {
+        return err
+    }
+    if expire > 0 {
+        _, err := p.Do("SETEX", p.getKey(key), expire, val)
+        return err
+    }
+    _, err = p.Do("SET", p.getKey(key), value)
+    return err
 }
 
 func (p *RDbPool) Get(key string) (reply interface{}, err error) {
-    reply, err = p.Do("GET", key)
+    reply, err = p.Do("GET", p.getKey(key))
     return reply, err
 }
 
-func (p *RDbPool) Update(key string, value interface{}) (reply interface{}, err error) {
-    reply, err = p.Do("SET", key, value)
+func (p *RDbPool) Delete(key string, value interface{}) (err error) {
+    _, err = p.Do("DEL", p.getKey(key), value)
+    return err
+}
+
+func (p *RDbPool) LPush(key string, value interface{}) (err error) {
+    val, err := p.encode(value)
+    if err != nil {
+        return err
+    }
+    _, err = p.Do("LPUSH", p.getKey(key), val)
+    return err
+}
+
+func (p *RDbPool) RPush(key string, value interface{}) (err error) {
+    val, err := p.encode(value)
+    if err != nil {
+        return err
+    }
+    _, err = p.Do("RPUSH", p.getKey(key), val)
+    return err
+}
+
+func (p *RDbPool) LPop(key string) (reply interface{}, err error) {
+    reply, err = p.Do("LPOP", p.getKey(key))
     return reply, err
 }
 
-func (p *RDbPool) Delete(key string, value interface{}) (reply interface{}, err error) {
-    reply, err = p.Do("DEL", key, value)
-    return reply, err
-}
-
-func (p *RDbPool) LPush(key string, value interface{}) (reply interface{}, err error) {
-    reply, err = p.Do("LPUSH", key, value)
-    return reply, err
-}
-
-func (p *RDbPool) RPush(key string, value interface{}) (reply interface{}, err error) {
-    reply, err = p.Do("RPUSH", key, value)
-    return reply, err
+func (p *RDbPool) LPopObject(key string, value interface{}) (err error) {
+    reply, err := p.LPop(key)
+    return p.decode(reply, err, value)
 }
 
 func (p *RDbPool) RPop(key string) (reply interface{}, err error) {
-    reply, err = p.Do("RPOP", key)
+    reply, err = p.Do("RPOP", p.getKey(key))
     return reply, err
+}
+
+func (p *RDbPool) RPopObject(key string, value interface{}) (err error) {
+    reply, err := p.RPop(key)
+    return p.decode(reply, err, value)
 }
