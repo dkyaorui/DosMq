@@ -205,6 +205,29 @@ func (m *DbMongoUtils) UpdateMany(col string, spc bson.M) ([]bson.M, error) {
     return nil, nil
 }
 
-func (m *DbMongoUtils) Count(col string, spc bson.M) int {
-    return 0
+func (m *DbMongoUtils) Count(col string, spc bson.M) (result int64, err error) {
+    if m.Database == nil || m.Client == nil {
+        return 0, fmt.Errorf("there is no database or client")
+    }
+    table := m.Database.Collection(col)
+    ctx, cancel := GetCtx()
+    defer cancel()
+
+    if result, err = table.CountDocuments(ctx, spc); err != nil {
+        return 0, err
+    }
+    return 0, nil
+}
+
+func (m *DbMongoUtils) Distinct(col string, filed string, spc bson.M) (result interface{}, err error) {
+    if m.Database == nil || m.Client == nil {
+        return nil, fmt.Errorf("there is no database or client")
+    }
+    table := m.Database.Collection(col)
+    ctx, cancel := GetCtx()
+    defer cancel()
+    if result, err = table.Distinct(ctx, filed, spc); err != nil {
+        return nil, err
+    }
+    return result, nil
 }

@@ -17,6 +17,7 @@ package main
 import (
     "DosMq/db/mongo"
     "DosMq/db/redis"
+    "DosMq/mq"
     "DosMq/router"
     "DosMq/utils"
     "flag"
@@ -42,6 +43,7 @@ func main() {
     redis.Init()
     mongo.Init()
 
+    mq.Init()
     // load router
     r := router.GetRouter()
     log.Info("router loaded……")
