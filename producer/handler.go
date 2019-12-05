@@ -4,6 +4,7 @@ import (
     Mongodb "DosMq/db/mongo"
     myRedis "DosMq/db/redis"
     MongoModule "DosMq/modules/mongo"
+    "DosMq/mq"
     "DosMq/utils"
     "github.com/gin-gonic/gin"
     "github.com/gin-gonic/gin/binding"
@@ -12,6 +13,7 @@ import (
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/bson/primitive"
     "net/http"
+    "strings"
     "time"
 )
 
@@ -52,6 +54,7 @@ func SendHandler(c *gin.Context) {
         return
     }
     if err = findResult.Decode(&owner); err != nil {
+        log.Errorf("[bind error] owner:%v", owner)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
             Data: err.Error(),
@@ -89,6 +92,45 @@ func SendHandler(c *gin.Context) {
             Data: err.Error(),
         })
         return
+    }
+    redisMqLen, err := redisClient.LLen(message.GetMqKey())
+    if err != nil {
+        log.Errorf("[set error]:%+v", errors.WithMessage(err, "redis error"))
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
+        return
+    }
+    var isSendToRedis = false
+    if redisMqLen == 0 {
+        msgQue := mq.MessageQueueMap[message.TopicId.Hex()]
+
+        mqErr := msgQue.Push(message)
+        log.Infof("%+v", msgQue)
+        if mqErr != nil {
+            if strings.Contains(mqErr.Error(), "lockFreeQueue is full") {
+                // push into redis
+                isSendToRedis = true
+            } else {
+                log.Errorf("[send error]:%+v", errors.WithMessage(mqErr, "push into que error"))
+                c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+                    Code: http.StatusBadGateway,
+                    Data: mqErr.Error(),
+                })
+            }
+        }
+    } else {
+        isSendToRedis = true
+    }
+
+    if isSendToRedis {
+        err = redisClient.LPush(message.GetMqKey(), message)
+        log.Errorf("[send error]:%+v", errors.WithMessage(err, "push into que error"))
+        c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
+            Code: http.StatusBadGateway,
+            Data: err.Error(),
+        })
     }
 
     c.JSON(http.StatusOK, utils.RequestResult{

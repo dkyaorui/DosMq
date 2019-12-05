@@ -147,3 +147,8 @@ func (p *RDbPool) RPopObject(key string, value interface{}) (err error) {
     reply, err := p.RPop(key)
     return p.decode(reply, err, value)
 }
+
+func (p *RDbPool) LLen(key string) (length int64, err error) {
+    reply, err := p.Do("LLEN", p.getKey(key))
+    return reply.(int64), err
+}
