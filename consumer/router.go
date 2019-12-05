@@ -5,6 +5,6 @@ import "github.com/gin-gonic/gin"
 func Routes(router *gin.Engine) {
 	consumerRouter := router.Group("/consumer")
 	{
-	    consumerRouter.POST("/test", TestHandler)
+	    consumerRouter.POST("/get", GetHandler)
 	}
 }

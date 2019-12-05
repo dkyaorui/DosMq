@@ -23,8 +23,8 @@ func Init() {
 
     result, err := mongoUtils.Distinct(MongoModule.DB_TOPIC, "_id", bson.M{})
     if err != nil {
-       log.Errorf("[distinct err]:%+v", errors.WithMessage(err, "db error"))
-       panic("db init error")
+        log.Errorf("[distinct err]:%+v", errors.WithMessage(err, "db error"))
+        panic("db init error")
     }
     topicArray := result.([]interface{})
     MessageQueueMap = make(map[string]*LFQueue)
@@ -35,6 +35,10 @@ func Init() {
     log.Info("mq init success")
 }
 
+/*
+   start n goroutine to get message in redis and then push into queue. N is topic's number.
+   start n goroutine to get message in queue and then push to subscriber. N is topic's number.
+*/
 func Start() {
 
 }
