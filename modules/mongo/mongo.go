@@ -290,3 +290,7 @@ func (o *Owner) GetRedisKey() string {
 func (m *Message) GetMqKey() string {
     return "message_" + hex.EncodeToString(m.TopicId[:])
 }
+
+func GetMqKeyByTopicId(topicID string) string {
+    return "message_" + topicID
+}
