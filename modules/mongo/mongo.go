@@ -5,7 +5,6 @@ import (
     "bytes"
     "crypto/md5"
     "encoding/hex"
-    "fmt"
     "github.com/pkg/errors"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/bson/primitive"
@@ -115,7 +114,6 @@ func (m *Message) GetHashCode() []byte {
 func (s *Subscriber) GetHashCode() []byte {
     // hash_code = server_name + host + key + api + method
     hashCode := md5.Sum([]byte(s.ServerName + s.Host + s.Key + s.Api + s.Method))
-    fmt.Print(hashCode)
     return hashCode[:]
 }
 
