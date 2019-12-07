@@ -8,6 +8,8 @@ import (
     log "github.com/sirupsen/logrus"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/bson/primitive"
+    "net/http"
+    "strings"
     "sync"
     "time"
 )
@@ -54,11 +56,26 @@ func Start() {
         panic("mq init error")
     }
     topicArray := result.([]interface{})
+    var wg = &sync.WaitGroup{}
     // start message in que send to subscribe
-
-
+    for _, item := range topicArray {
+        wg.Add(1)
+        val := item.(primitive.ObjectID)
+        findResult, err := mongoUtils.FindOne(MongoModule.DB_TOPIC, bson.M{"_id": val})
+        if err != nil {
+            log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
+            continue
+        }
+        var topic MongoModule.Topic
+        if err = findResult.Decode(&topic); err != nil {
+            log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
+            continue
+        }
+        if strings.Compare(strings.ToLower(topic.ProcessMessageType), "push") == 0 {
+            go pushMessageToSubscriber(val.Hex())
+        }
+    }
     // start message in redis send to que
-    var wg sync.WaitGroup
     for _, item := range topicArray {
         wg.Add(1)
         val := item.(primitive.ObjectID)
@@ -102,5 +119,86 @@ func redisToQue(topicId string) {
 }
 
 func pushMessageToSubscriber(topicId string) {
+    // init
+    msgQue := MessageQueueMap[topicId]
+    mongoUtils := Mongodb.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    topicIdObj, err := primitive.ObjectIDFromHex(topicId)
+    if err != nil {
+        log.Errorf("err:%+v", errors.WithMessage(err, "topic id is wrong"))
+    }
+    findResult, err := mongoUtils.FindMore(MongoModule.DB_SUBSCRIBER, bson.M{"topic_id": topicIdObj})
+    if err != nil {
+        log.Errorf("err:%+v", errors.WithMessage(err, "[find err] find the topic wrong"))
+        return
+    }
+    resultLength := len(findResult)
+    subscribers := make([]MongoModule.Subscriber, resultLength)
+    for index, item := range findResult {
+        var subscriber MongoModule.Subscriber
+        itemByte, _ := bson.Marshal(item)
+        err = bson.Unmarshal(itemByte, &subscriber)
+        if err != nil {
+            log.Errorf("err:%+v", errors.WithMessage(err, "the item is not subscriber"))
+            return
+        }
+        subscribers[index] = subscriber
+    }
+    mongoUtils.CloseConn()
+    // main
+    for {
+        item, msgErr := msgQue.Pop()
+        if msgErr != nil {
+            if strings.Contains(msgErr.Error(), "lockFreeQueue is empty") {
+                continue
+            }
+            log.Error("queue's item is not message")
+            continue
+        }
+        message, ok := item.(MongoModule.Message)
+        if ok {
+            var wg = &sync.WaitGroup{}
+            for _, subscriber := range subscribers {
+                go func() {
+                    defer wg.Done()
+                    var req *http.Request
+                    var err error
+                    switch strings.ToUpper(subscriber.Method) {
+                    case http.MethodGet:
+                        req, err = methodGetRequest(message, subscriber)
+                    case http.MethodPost:
+                        req, err = methodPostRequest(message, subscriber)
+                    }
+                    if err != nil {
+                        log.Errorf("err:%+v", errors.WithMessage(err, "new request fail"))
+                        return
+                    }
+                    c := &http.Client{}
+                    _, err = c.Do(req)
+                }()
+            }
+            wg.Wait()
+        }
+    }
+}
 
+func methodGetRequest(message MongoModule.Message, subscriber MongoModule.Subscriber) (*http.Request, error) {
+    req, err := http.NewRequest(http.MethodGet, subscriber.Host+subscriber.Api, nil)
+    if err != nil {
+        return nil, err
+    }
+    req.URL.Query().Add("message", message.Value)
+    req.URL.Query().Add("message", message.Value)
+    return req, err
+}
+
+func methodPostRequest(message MongoModule.Message, subscriber MongoModule.Subscriber) (*http.Request, error) {
+    req, err := http.NewRequest(http.MethodPost, subscriber.Host+subscriber.Api, nil)
+    if err != nil {
+        return nil, err
+    }
+    req.Form.Add("message", message.Value)
+    req.Form.Add("auth_key", subscriber.Key)
+    return req, err
 }

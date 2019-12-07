@@ -107,7 +107,6 @@ func SendHandler(c *gin.Context) {
         msgQue := mq.MessageQueueMap[message.TopicId.Hex()]
 
         mqErr := msgQue.Push(message)
-        log.Infof("%+v", msgQue)
         if mqErr != nil {
             if strings.Contains(mqErr.Error(), "lockFreeQueue is full") {
                 // push into redis

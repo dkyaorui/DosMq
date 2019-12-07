@@ -48,6 +48,8 @@ func main() {
     r := router.GetRouter()
     log.Info("router loaded……")
 
+    // start listen message queue
+    go mq.Start()
     // run server
     if err := r.Run(":8080"); err != nil {
         log.Error(err)
