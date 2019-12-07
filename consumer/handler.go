@@ -2,7 +2,7 @@ package consumer
 
 import (
     Mongodb "DosMq/db/mongo"
-    mongoModule "DosMq/modules/mongo"
+    "DosMq/modules"
     "DosMq/mq"
     "DosMq/utils"
     "github.com/gin-gonic/gin"
@@ -19,7 +19,7 @@ import (
 */
 
 func GetHandler(c *gin.Context) {
-    var subscriber mongoModule.Subscriber
+    var subscriber modules.Subscriber
     var err error
 
     if err = c.ShouldBindBodyWith(&subscriber, binding.JSON); err != nil {
@@ -37,7 +37,7 @@ func GetHandler(c *gin.Context) {
     defer mongoUtils.CloseConn()
 
     subscriber.HashCode = subscriber.GetHashCode()
-    findResult, err := mongoUtils.FindOne(mongoModule.DB_SUBSCRIBER, bson.M{"hash_code": subscriber.HashCode})
+    findResult, err := mongoUtils.FindOne(modules.DB_SUBSCRIBER, bson.M{"hash_code": subscriber.HashCode})
     if err != nil {
         log.Errorf("[find error] subscriber:%v, err:%+v", subscriber,
             errors.WithMessage(err, "find error"))
@@ -67,7 +67,7 @@ func GetHandler(c *gin.Context) {
             return
         }
     }
-    message, ok := queItem.(mongoModule.Message)
+    message, ok := queItem.(modules.Message)
     if ok {
         // return message to subscriber
         log.Info("[pull message] message:%+v", message)

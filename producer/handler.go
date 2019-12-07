@@ -3,7 +3,7 @@ package producer
 import (
     Mongodb "DosMq/db/mongo"
     myRedis "DosMq/db/redis"
-    MongoModule "DosMq/modules/mongo"
+    "DosMq/modules"
     "DosMq/mq"
     "DosMq/utils"
     "github.com/gin-gonic/gin"
@@ -18,8 +18,8 @@ import (
 )
 
 func SendHandler(c *gin.Context) {
-    var owner MongoModule.Owner
-    var message MongoModule.Message
+    var owner modules.Owner
+    var message modules.Message
     var err error
     if err = c.ShouldBindBodyWith(&owner, binding.JSON); err != nil {
         log.Infof("binding data error,struct:%s", "owner")
@@ -44,7 +44,7 @@ func SendHandler(c *gin.Context) {
     defer mongoUtils.CloseConn()
 
     owner.HashCode = owner.GetHashCode()
-    findResult, err := mongoUtils.FindOne(MongoModule.DB_OWNER, bson.M{"hash_code": owner.HashCode})
+    findResult, err := mongoUtils.FindOne(modules.DB_OWNER, bson.M{"hash_code": owner.HashCode})
     if err != nil {
         log.Errorf("[find error] owner:%v", owner)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{

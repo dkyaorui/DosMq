@@ -3,7 +3,7 @@ package mq
 import (
     Mongodb "DosMq/db/mongo"
     myRedis "DosMq/db/redis"
-    MongoModule "DosMq/modules/mongo"
+    "DosMq/modules"
     "github.com/pkg/errors"
     log "github.com/sirupsen/logrus"
     "go.mongodb.org/mongo-driver/bson"
@@ -26,7 +26,7 @@ func Init() {
     mongoUtils.SetDB(mongoUtils.DBName)
     defer mongoUtils.CloseConn()
 
-    result, err := mongoUtils.Distinct(MongoModule.DB_TOPIC, "_id", bson.M{})
+    result, err := mongoUtils.Distinct(modules.DB_TOPIC, "_id", bson.M{})
     if err != nil {
         log.Errorf("[distinct err]:%+v", errors.WithMessage(err, "db error"))
         panic("db init error")
@@ -50,7 +50,7 @@ func Start() {
     mongoUtils.SetDB(mongoUtils.DBName)
     defer mongoUtils.CloseConn()
 
-    result, err := mongoUtils.Distinct(MongoModule.DB_TOPIC, "_id", bson.M{})
+    result, err := mongoUtils.Distinct(modules.DB_TOPIC, "_id", bson.M{})
     if err != nil {
         log.Errorf("[distinct err]:%+v", errors.WithMessage(err, "db error"))
         panic("mq init error")
@@ -61,12 +61,12 @@ func Start() {
     for _, item := range topicArray {
         wg.Add(1)
         val := item.(primitive.ObjectID)
-        findResult, err := mongoUtils.FindOne(MongoModule.DB_TOPIC, bson.M{"_id": val})
+        findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": val})
         if err != nil {
             log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
             continue
         }
-        var topic MongoModule.Topic
+        var topic modules.Topic
         if err = findResult.Decode(&topic); err != nil {
             log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
             continue
@@ -87,7 +87,7 @@ func Start() {
 
 func redisToQue(topicId string) {
     redisClient := &myRedis.RDbClient
-    redisKey := MongoModule.GetMqKeyByTopicId(topicId)
+    redisKey := modules.GetMqKeyByTopicId(topicId)
     msgQue := MessageQueueMap[topicId]
     for {
         redisMqLen, err := redisClient.LLen(redisKey)
@@ -102,7 +102,7 @@ func redisToQue(topicId string) {
                 if err != nil {
                     log.Errorf("[find error]:%+v", errors.WithMessage(err, "redis error"))
                 } else {
-                    message := reply.(MongoModule.Message)
+                    message := reply.(modules.Message)
                     for {
                         mqErr := msgQue.Push(message)
                         if mqErr != nil {
@@ -128,15 +128,15 @@ func pushMessageToSubscriber(topicId string) {
     if err != nil {
         log.Errorf("err:%+v", errors.WithMessage(err, "topic id is wrong"))
     }
-    findResult, err := mongoUtils.FindMore(MongoModule.DB_SUBSCRIBER, bson.M{"topic_id": topicIdObj})
+    findResult, err := mongoUtils.FindMore(modules.DB_SUBSCRIBER, bson.M{"topic_id": topicIdObj})
     if err != nil {
         log.Errorf("err:%+v", errors.WithMessage(err, "[find err] find the topic wrong"))
         return
     }
     resultLength := len(findResult)
-    subscribers := make([]MongoModule.Subscriber, resultLength)
+    subscribers := make([]modules.Subscriber, resultLength)
     for index, item := range findResult {
-        var subscriber MongoModule.Subscriber
+        var subscriber modules.Subscriber
         itemByte, _ := bson.Marshal(item)
         err = bson.Unmarshal(itemByte, &subscriber)
         if err != nil {
@@ -156,7 +156,7 @@ func pushMessageToSubscriber(topicId string) {
             log.Error("queue's item is not message")
             continue
         }
-        message, ok := item.(MongoModule.Message)
+        message, ok := item.(modules.Message)
         if ok {
             var wg = &sync.WaitGroup{}
             for _, subscriber := range subscribers {
@@ -183,7 +183,7 @@ func pushMessageToSubscriber(topicId string) {
     }
 }
 
-func methodGetRequest(message MongoModule.Message, subscriber MongoModule.Subscriber) (*http.Request, error) {
+func methodGetRequest(message modules.Message, subscriber modules.Subscriber) (*http.Request, error) {
     req, err := http.NewRequest(http.MethodGet, subscriber.Host+subscriber.Api, nil)
     if err != nil {
         return nil, err
@@ -193,7 +193,7 @@ func methodGetRequest(message MongoModule.Message, subscriber MongoModule.Subscr
     return req, err
 }
 
-func methodPostRequest(message MongoModule.Message, subscriber MongoModule.Subscriber) (*http.Request, error) {
+func methodPostRequest(message modules.Message, subscriber modules.Subscriber) (*http.Request, error) {
     req, err := http.NewRequest(http.MethodPost, subscriber.Host+subscriber.Api, nil)
     if err != nil {
         return nil, err
