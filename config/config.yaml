@@ -1,0 +1,21 @@
+log:
+  path: "/tmp"
+  name: "DosMq.log"
+
+redis:
+  host: www.moyee.club
+  port: 6379
+  db: 1
+  maxidle: 6
+  maxactive: 16
+
+mongo:
+  host: www.moyee.club
+  port: 27017
+  db_name: dosmq
+  user: moyee
+  auth: true
+  auth_source: dosmq
+
+topic:
+  key: HelloWorld

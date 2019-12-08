@@ -1,0 +1,11 @@
+# IDE files
+coverage/
+.vscode/
+.idea/
+
+# vendor
+vendor/*
+!vendor.json
+
+# log files
+*.log
