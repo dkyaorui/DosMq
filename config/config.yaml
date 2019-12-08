@@ -6,8 +6,8 @@ redis:
   host: www.moyee.club
   port: 6379
   db: 1
-  maxidle: 2
-  maxactive: 12
+  maxidle: 6
+  maxactive: 16
 
 mongo:
   host: www.moyee.club

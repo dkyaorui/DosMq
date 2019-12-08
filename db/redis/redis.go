@@ -2,7 +2,6 @@ package redis
 
 import (
     "encoding/json"
-    "fmt"
     "github.com/gomodule/redigo/redis"
     "github.com/pkg/errors"
     log "github.com/sirupsen/logrus"
@@ -32,8 +31,7 @@ func Init() {
                 redis.DialPassword(redisPassword))
             if err != nil {
                 err = errors.Wrap(err, "Redis connect error")
-                fmt.Println(err)
-                log.Panicf("%+v", err)
+                log.Errorf("%+v", err)
             }
             _, _ = conn.Do("SELECT", redisConfig["db"])
             return conn, err
@@ -150,5 +148,8 @@ func (p *RDbPool) RPopObject(key string, value interface{}) (err error) {
 
 func (p *RDbPool) LLen(key string) (length int64, err error) {
     reply, err := p.Do("LLEN", p.getKey(key))
+    if err != nil{
+        return 0, err
+    }
     return reply.(int64), err
 }

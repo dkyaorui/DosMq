@@ -273,6 +273,27 @@ func (t *Topic) DelSubscribe(target Subscriber) {
     }
 }
 
+func (t *Topic) GetAllSubscribers() ([]Subscriber, error) {
+    mongoUtils := myMongo.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    defer mongoUtils.CloseConn()
+
+    findResult, err := mongoUtils.FindMore(DB_SUBSCRIBER, bson.M{"topic_id": t.Id})
+    if err != nil {
+        return nil, err
+    }
+    resultLength := len(findResult)
+    subscribers := make([]Subscriber, resultLength)
+    for index, item := range findResult {
+        var subscriber Subscriber
+        itemByte, _ := bson.Marshal(item)
+        _ = bson.Unmarshal(itemByte, &subscriber)
+        subscribers[index] = subscriber
+    }
+    return subscribers, nil
+}
+
 func (t *Topic) GetRedisKey() string {
     return "topic_" + hex.EncodeToString(t.HashCode)
 }

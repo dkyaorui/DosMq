@@ -14,74 +14,65 @@ import (
     "time"
 )
 
-var MessageQueueMap map[string]*LFQueue
+var MessageQueueMap = make(map[string]*LFQueue)
 var NewQueueChannel = make(chan string, 8)
+var MessageProcessWorkers *threadSafeWorkers
+var globalQuit = make(chan struct{})
 
-/*
-count the num of topic in mongodb.And creat the lfQueue for all of them.
-So this function must run after db.Init().
-*/
-func Init() {
-    mongoUtils := Mongodb.Utils
-    mongoUtils.OpenConn()
-    mongoUtils.SetDB(mongoUtils.DBName)
-    defer mongoUtils.CloseConn()
 
-    result, err := mongoUtils.Distinct(modules.DB_TOPIC, "_id", bson.M{})
-    if err != nil {
-        log.Errorf("[distinct err]:%+v", errors.WithMessage(err, "db error"))
-        panic("db init error")
-    }
-    topicArray := result.([]interface{})
-    MessageQueueMap = make(map[string]*LFQueue)
-    for _, item := range topicArray {
-        val := item.(primitive.ObjectID)
-        MessageQueueMap[val.Hex()] = NewQue(1024)
-    }
-    log.Info("mq init success")
+type QueWorker struct {
+    topicIDHex string
+    source     chan string
+    quit       chan struct{}
 }
 
-/*
-   start n goroutine to get message in redis and then push into queue. N is topic's number.
-   start n goroutine to get message in queue and then push to subscriber. N is topic's number.
-*/
-func Start() {
+type threadSafeWorkers struct {
+    sync.Mutex
+    workers []*QueWorker
+}
+
+func (q *QueWorker) Start() {
+    q.source = make(chan string)
     mongoUtils := Mongodb.Utils
     mongoUtils.OpenConn()
     mongoUtils.SetDB(mongoUtils.DBName)
-    defer mongoUtils.CloseConn()
-
-    result, err := mongoUtils.Distinct(modules.DB_TOPIC, "_id", bson.M{})
+    topicID, _ := primitive.ObjectIDFromHex(q.topicIDHex)
+    findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": topicID})
     if err != nil {
-        log.Errorf("[distinct err]:%+v", errors.WithMessage(err, "db error"))
-        panic("mq init error")
+        log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
+        return
     }
-    topicArray := result.([]interface{})
-    // start message in que send to subscribe and start message in redis send to que
-    for _, item := range topicArray {
-        topicId := item.(primitive.ObjectID)
-        findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": topicId})
-        if err != nil {
-            log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
-            continue
-        }
-        var topic modules.Topic
-        if err = findResult.Decode(&topic); err != nil {
-            log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
-            continue
-        }
-        if strings.Compare(strings.ToLower(topic.ProcessMessageType), "push") == 0 {
-            go pushMessageToSubscriber(topicId.Hex())
-        }
-        go redisToQue(topicId.Hex())
+    var topic modules.Topic
+    if err = findResult.Decode(&topic); err != nil {
+        log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
+        return
     }
-    log.Info("mq init success")
-    // listen new que
+    MessageQueueMap[q.topicIDHex] = NewQue(1024)
+    if strings.Compare(strings.ToLower(topic.ProcessMessageType), "push") == 0 {
+        go pushMessageToSubscriber(q.topicIDHex)
+    }
+    go redisToQue(q.topicIDHex)
+
+    mongoUtils.CloseConn()
     for {
-        topicIdHex := <- NewQueueChannel
-        log.Infof("recive:%s", topicIdHex)
-        go StartNewQue(topicIdHex)
+        select {
+        case <-q.quit:
+            log.Infof("%s que is quit", q.topicIDHex)
+            return
+        case msg := <-q.source:
+            if strings.Compare(msg, q.topicIDHex) == 0 {
+                log.Infof("%s que is quit", q.topicIDHex)
+                return
+            }
+        }
     }
+}
+
+func (t *threadSafeWorkers) push(w *QueWorker) {
+    t.Lock()
+    defer t.Unlock()
+
+    t.workers = append(t.workers, w)
 }
 
 func redisToQue(topicId string) {
@@ -117,38 +108,6 @@ func redisToQue(topicId string) {
     }
 }
 
-func StartNewQue(topicIdHex string) {
-    log.Infof("start a new que, %s", topicIdHex)
-    MessageQueueMap[topicIdHex] = NewQue(1024)
-    mongoUtils := Mongodb.Utils
-    mongoUtils.OpenConn()
-    mongoUtils.SetDB(mongoUtils.DBName)
-    topicID, _ := primitive.ObjectIDFromHex(topicIdHex)
-    var topic modules.Topic
-    for {
-        findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": topicID})
-        if err != nil {
-            log.Errorf("err:%+v", errors.WithMessage(err, "start new que: find topic error"))
-            continue
-        }
-
-        if err = findResult.Decode(&topic); err != nil {
-            log.Errorf("err:%+v", errors.WithMessage(err, "start new que: decode topic error"))
-        } else {
-            break
-        }
-    }
-    var wg = sync.WaitGroup{}
-    if strings.Compare(strings.ToLower(topic.ProcessMessageType), "push") == 0 {
-        wg.Add(1)
-        go pushMessageToSubscriber(topicIdHex)
-    }
-    wg.Add(1)
-    go redisToQue(topicIdHex)
-    mongoUtils.CloseConn()
-    wg.Wait()
-}
-
 func pushMessageToSubscriber(topicIdHex string) {
     // init
     msgQue := MessageQueueMap[topicIdHex]
@@ -159,23 +118,13 @@ func pushMessageToSubscriber(topicIdHex string) {
     if err != nil {
         log.Errorf("err:%+v", errors.WithMessage(err, "topic id is wrong"))
     }
-    findResult, err := mongoUtils.FindMore(modules.DB_SUBSCRIBER, bson.M{"topic_id": topicIdObj})
+    findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": topicIdObj})
     if err != nil {
         log.Errorf("err:%+v", errors.WithMessage(err, "[find err] find the topic wrong"))
         return
     }
-    resultLength := len(findResult)
-    subscribers := make([]modules.Subscriber, resultLength)
-    for index, item := range findResult {
-        var subscriber modules.Subscriber
-        itemByte, _ := bson.Marshal(item)
-        err = bson.Unmarshal(itemByte, &subscriber)
-        if err != nil {
-            log.Errorf("err:%+v", errors.WithMessage(err, "the item is not subscriber"))
-            return
-        }
-        subscribers[index] = subscriber
-    }
+    var topic modules.Topic
+    _ = findResult.Decode(&topic)
     mongoUtils.CloseConn()
     // main
     for {
@@ -189,8 +138,10 @@ func pushMessageToSubscriber(topicIdHex string) {
         }
         message, ok := item.(modules.Message)
         if ok {
+            subscribers, _ := topic.GetAllSubscribers()
             var wg = &sync.WaitGroup{}
             for _, subscriber := range subscribers {
+                wg.Add(1)
                 go func() {
                     defer wg.Done()
                     var req *http.Request
@@ -232,4 +183,50 @@ func methodPostRequest(message modules.Message, subscriber modules.Subscriber) (
     req.Form.Add("message", message.Value)
     req.Form.Add("auth_key", subscriber.Key)
     return req, err
+}
+
+/*
+count the num of topic in mongodb.And creat the lfQueue for all of them.
+So this function must run after db.Init().
+*/
+
+/*
+   start n goroutine to get message in redis and then push into queue. N is topic's number.
+   start n goroutine to get message in queue and then push to subscriber. N is topic's number.
+*/
+func StartProcess() {
+    mongoUtils := Mongodb.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    defer mongoUtils.CloseConn()
+    MessageProcessWorkers = &threadSafeWorkers{}
+    result, err := mongoUtils.Distinct(modules.DB_TOPIC, "_id", bson.M{})
+    if err != nil {
+        log.Errorf("[distinct err]:%+v", errors.WithMessage(err, "db error"))
+        panic("mq init error")
+    }
+    topicArray := result.([]interface{})
+    // start message in que send to subscribe and start message in redis send to que
+    for _, item := range topicArray {
+        topicId := item.(primitive.ObjectID)
+        var worker = QueWorker{
+            topicIDHex: topicId.Hex(),
+            quit:       globalQuit,
+        }
+        MessageProcessWorkers.push(&worker)
+        go worker.Start()
+    }
+    log.Info("mq init success")
+    // listen new que
+    for {
+        topicIdHex := <-NewQueueChannel
+        var worker = QueWorker{
+            topicIDHex: topicIdHex,
+            quit:       globalQuit,
+        }
+        log.Infof("recive:%s", topicIdHex)
+        MessageProcessWorkers.push(&worker)
+        go worker.Start()
+        //go StartNewQue(topicIdHex)
+    }
 }
