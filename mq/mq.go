@@ -15,6 +15,7 @@ import (
 )
 
 var MessageQueueMap map[string]*LFQueue
+var NewQueueChannel = make(chan string, 8)
 
 /*
 count the num of topic in mongodb.And creat the lfQueue for all of them.
@@ -56,12 +57,10 @@ func Start() {
         panic("mq init error")
     }
     topicArray := result.([]interface{})
-    var wg = &sync.WaitGroup{}
-    // start message in que send to subscribe
+    // start message in que send to subscribe and start message in redis send to que
     for _, item := range topicArray {
-        wg.Add(1)
-        val := item.(primitive.ObjectID)
-        findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": val})
+        topicId := item.(primitive.ObjectID)
+        findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": topicId})
         if err != nil {
             log.Errorf("err:%+v", errors.WithMessage(err, "queue init wrong"))
             continue
@@ -72,17 +71,17 @@ func Start() {
             continue
         }
         if strings.Compare(strings.ToLower(topic.ProcessMessageType), "push") == 0 {
-            go pushMessageToSubscriber(val.Hex())
+            go pushMessageToSubscriber(topicId.Hex())
         }
-    }
-    // start message in redis send to que
-    for _, item := range topicArray {
-        wg.Add(1)
-        val := item.(primitive.ObjectID)
-        go redisToQue(val.Hex())
+        go redisToQue(topicId.Hex())
     }
     log.Info("mq init success")
-    wg.Wait()
+    // listen new que
+    for {
+        topicIdHex := <- NewQueueChannel
+        log.Infof("recive:%s", topicIdHex)
+        go StartNewQue(topicIdHex)
+    }
 }
 
 func redisToQue(topicId string) {
@@ -118,13 +117,45 @@ func redisToQue(topicId string) {
     }
 }
 
-func pushMessageToSubscriber(topicId string) {
-    // init
-    msgQue := MessageQueueMap[topicId]
+func StartNewQue(topicIdHex string) {
+    log.Infof("start a new que, %s", topicIdHex)
+    MessageQueueMap[topicIdHex] = NewQue(1024)
     mongoUtils := Mongodb.Utils
     mongoUtils.OpenConn()
     mongoUtils.SetDB(mongoUtils.DBName)
-    topicIdObj, err := primitive.ObjectIDFromHex(topicId)
+    topicID, _ := primitive.ObjectIDFromHex(topicIdHex)
+    var topic modules.Topic
+    for {
+        findResult, err := mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": topicID})
+        if err != nil {
+            log.Errorf("err:%+v", errors.WithMessage(err, "start new que: find topic error"))
+            continue
+        }
+
+        if err = findResult.Decode(&topic); err != nil {
+            log.Errorf("err:%+v", errors.WithMessage(err, "start new que: decode topic error"))
+        } else {
+            break
+        }
+    }
+    var wg = sync.WaitGroup{}
+    if strings.Compare(strings.ToLower(topic.ProcessMessageType), "push") == 0 {
+        wg.Add(1)
+        go pushMessageToSubscriber(topicIdHex)
+    }
+    wg.Add(1)
+    go redisToQue(topicIdHex)
+    mongoUtils.CloseConn()
+    wg.Wait()
+}
+
+func pushMessageToSubscriber(topicIdHex string) {
+    // init
+    msgQue := MessageQueueMap[topicIdHex]
+    mongoUtils := Mongodb.Utils
+    mongoUtils.OpenConn()
+    mongoUtils.SetDB(mongoUtils.DBName)
+    topicIdObj, err := primitive.ObjectIDFromHex(topicIdHex)
     if err != nil {
         log.Errorf("err:%+v", errors.WithMessage(err, "topic id is wrong"))
     }

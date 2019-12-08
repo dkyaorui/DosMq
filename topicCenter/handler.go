@@ -3,6 +3,7 @@ package topicCenter
 import (
     Mongodb "DosMq/db/mongo"
     "DosMq/modules"
+    "DosMq/mq"
     "DosMq/utils"
     "github.com/gin-gonic/gin"
     "github.com/gin-gonic/gin/binding"
@@ -106,7 +107,8 @@ func TopicRegisterHandler(c *gin.Context) {
         return
     }
     log.Infof("[insert]owner:%v", owner)
-
+    queChannel := &mq.NewQueueChannel
+    *queChannel <- topic.Id.Hex()
     c.JSON(http.StatusOK, utils.RequestResult{
         Code: http.StatusOK,
         Data: "register topic success",
