@@ -187,7 +187,7 @@ func TopicDelHandler(c *gin.Context) {
         return
     }
     log.Infof("[delete] owner id: %v", owner.Id)
-
+    mq.DelTopicChannel <- owner.TopicID.Hex()
     c.JSON(http.StatusOK, utils.RequestResult{
         Code: http.StatusOK,
         Data: "del success",

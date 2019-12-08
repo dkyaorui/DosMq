@@ -1,61 +1,61 @@
 # DosMq
 
+[English](README.md)
 
-Message queue middleware based on `Golang` that can be deployed  as an independent project.
+基于`golang`开发的消息队列中间件，可作为独立项目部署。
 
-[中文](README_ZH.md)
 
-**Version**: ![Dosmq](https://img.shields.io/badge/Dosmq-1.0.0-blue)
 
-**Dependency**:
+**版本**：![Dosmq](https://img.shields.io/badge/Dosmq-1.0.0-blue)
+
+**环境依赖**：
 
 ![go-1.13.4](https://img.shields.io/badge/go-1.13.4-green)
 ![Mongo-latest](https://img.shields.io/badge/Mongo-latest-red)
 ![Redis-latest](https://img.shields.io/badge/Redis-latest-red)
 
-##  Deployment
+## 部署方式
 
-We need a linux server with `redis` and `mongodb`, and install `go-1.13.4` first.
+准备好`redis`和`mongodb`数据库，安装`go-1.13.4`环境
 
-If you set password for database, you should set variable in environment:
-
+如果数据库有密码需要在环境变量中设置以下字段：
 - `REDIS_PASSWORD`
 - `MONGO_PASSWORD`
 
-### Deploy step
+### 部署步骤
 
-- Install dependency
+- 安装依赖
 
 ```bash
 $ go mod download
 ```
 
-- Edit the config file: `/config/config.yaml`
+- 修改配置文件 `/config/config.yaml`
 
-- Build the project
+- 编译项目
 
 ```bash
 $ go build -o dosmq
 ```
 
-- Run the Project
+- 运行项目
 
 ```bash
 $ ./dosmq
 ```
 
 
-## API Document
+## API 文档
 
 `/api/consumer/get`
 
-Note：if `topic_process_type` is`get`，consumer can get one message.
+说明：`topic_process_type`为`get`时，消费者可调用的接口，用于获取一条信息。
 
-Method：`POST`
+方法：`POST`
 
-Headers：`applications/json`
+请求头：`applications/json`
 
-Parameter：
+参数：
 
 ```json
 {	
@@ -67,7 +67,7 @@ Parameter：
 }
 ```
 
-return：
+返回值：
 ```json
 {
     "Code": "Http.StatusCode",
@@ -77,13 +77,13 @@ return：
 
 `/api/producer/send`
 
-Note：An api for producer send one message.
+说明：消息发送方发送消息的接口
 
-Method：`POST`
+方法：`POST`
 
-Headers：`applications/json`
+请求头：`applications/json`
 
-Parameter：
+参数：
 
 ```json
 {	
@@ -95,7 +95,7 @@ Parameter：
 }
 ```
 
-return：
+返回值：
 
 ```json
 {
@@ -106,13 +106,13 @@ return：
 
 `/api/topic/sign_up`
 
-Note：An api for producer sign up a topic.
+说明：消息发送方注册主题的接口
 
-Method：`POST`
+方法：`POST`
 
-Headers：`applications/json`
+请求头：`applications/json`
 
-Parameter：
+参数：
 
 ```json
 {	
@@ -125,7 +125,7 @@ Parameter：
 }
 ```
 
-return：
+返回值：
 
 ```json
 {
@@ -136,13 +136,13 @@ return：
 
 `/api/topic/del`
 
-Note：An api for producer del one topic.
+说明：消息发送方删除主题的接口
 
-Method：`POST`
+方法：`POST`
 
-Headers：`applications/json`
+请求头：`applications/json`
 
-Parameter：
+参数：
 
 ```json
 {	
@@ -155,7 +155,7 @@ Parameter：
 }
 ```
 
-return：
+返回值：
 
 ```json
 {
@@ -166,13 +166,13 @@ return：
 
 `/api/topic/subscribe`
 
-Note：An api for consumer subscribe one topic.
+说明：消息接收方订阅主题的接口
 
-Method：`POST`
+方法：`POST`
 
-Headers：`applications/json`
+请求头：`applications/json`
 
-Parameter：
+参数：
 
 ```json
 {	
@@ -188,7 +188,7 @@ Parameter：
 }
 ```
 
-return：
+返回值：
 
 ```json
 {
@@ -199,13 +199,13 @@ return：
 
 `/api/topic/cancel_subscribe`
 
-Note：An api for consumer unsubscribe one topic.
+说明：消息接收方取消订阅主题的接口
 
-Method：`POST`
+方法：`POST`
 
-Headers：`applications/json`
+请求头：`applications/json`
 
-Parameter：
+参数：
 
 ```json
 {	 
@@ -221,7 +221,7 @@ Parameter：
 }
 ```
 
-return：
+返回值：
 
 ```json
 {

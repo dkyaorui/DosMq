@@ -6,7 +6,7 @@ import (
 )
 
 func Routes(router *gin.Engine) {
-    topicRouter := router.Group("/topic")
+    topicRouter := router.Group("/api/topic")
     topicRouter.Use(middleware.CheckAuthKeyMiddleware())
     {
         topicRouter.POST("/sign_up", TopicRegisterHandler)

@@ -18,6 +18,7 @@ var MessageQueueMap = make(map[string]*LFQueue)
 var NewQueueChannel = make(chan string, 8)
 var MessageProcessWorkers *threadSafeWorkers
 var globalQuit = make(chan struct{})
+var DelTopicChannel = make(chan string, 4)
 
 
 type QueWorker struct {
@@ -73,6 +74,12 @@ func (t *threadSafeWorkers) push(w *QueWorker) {
     defer t.Unlock()
 
     t.workers = append(t.workers, w)
+}
+
+func (t *threadSafeWorkers) notice(msg string) {
+    for _, worker := range t.workers{
+        worker.source <- msg
+    }
 }
 
 func redisToQue(topicId string) {
@@ -219,14 +226,17 @@ func StartProcess() {
     log.Info("mq init success")
     // listen new que
     for {
-        topicIdHex := <-NewQueueChannel
-        var worker = QueWorker{
-            topicIDHex: topicIdHex,
-            quit:       globalQuit,
+        select {
+        case topicIdHex := <-NewQueueChannel:
+            var worker = QueWorker{
+                topicIDHex: topicIdHex,
+                quit:       globalQuit,
+            }
+            log.Infof("recive:%s", topicIdHex)
+            MessageProcessWorkers.push(&worker)
+            go worker.Start()
+        case delTopicIdHex := <- DelTopicChannel:
+            MessageProcessWorkers.notice(delTopicIdHex)
         }
-        log.Infof("recive:%s", topicIdHex)
-        MessageProcessWorkers.push(&worker)
-        go worker.Start()
-        //go StartNewQue(topicIdHex)
     }
 }
