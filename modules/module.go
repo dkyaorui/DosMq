@@ -5,34 +5,31 @@ import (
     "bytes"
     "crypto/md5"
     "encoding/hex"
+    "strings"
+
     "github.com/pkg/errors"
     "go.mongodb.org/mongo-driver/bson"
     "go.mongodb.org/mongo-driver/bson/primitive"
-    "strings"
-    "time"
 )
 
 const (
-    DB_SUBSCRIBER = "subscriber"
-    DB_TOPIC      = "topic"
-    DB_OWNER      = "owner"
-    DB_MESSAGE    = "message"
+    DbSubscriber = "subscriber"
+    DbTopic    = "topic"
+    DbOwner   = "owner"
+    DbMessage = "message"
 )
 
+// AuthKey The required params of requests
 type AuthKey struct {
     Value string `json:"auth_key" binding:"required"`
 }
 
+// ModuleUtils some tools of Module
 type ModuleUtils interface {
     GetHashCode() []byte
     GetRedisKey() string
-    // if not exist false
+    // return false if not exist
     CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error)
-}
-
-type RequestMessage struct {
-    RecvRequest []byte    `bson:"receive_request"`
-    Created     time.Time `bson:"created"`
 }
 
 /*
@@ -48,10 +45,10 @@ type RequestMessage struct {
        （2）当订阅方式为push时，订阅者可以选择在自身服务中对key做校验处理，防止恶意请求导致服务器处理无效请求
 */
 
-// collection_name: topic
+// Topic collection_name: topic
 type Topic struct {
-    Id                 primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
-    Name               string             `bson:"name" json:"topic_name" binding:"required"`
+    ID   primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
+    Name string             `bson:"name" json:"topic_name" binding:"required"`
     ProcessMessageType string             `bson:"process_message_type" json:"topic_process_type" binding:"required"` // pull or push
     Subscribers        []Subscriber       `bson:"subscribers" json:"topic_subscribers" binding:"-"`
     Owner              Owner              `bson:"owner" json:"topic_owner" binding:"-"`
@@ -59,8 +56,7 @@ type Topic struct {
 }
 
 /*
-消息
-collection_name: message
+Message collection_name: message
 
 push the message to their topic's message queue.If the queue is full,
 save the message into redis.
@@ -69,17 +65,16 @@ when consumer use the message,query in redis first and if no data in redis then
 get message in queue.when the message is used then save it in mongodb.
 */
 type Message struct {
-    Id        primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
+    ID        primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
     TopicId   primitive.ObjectID `bson:"topic_id" json:"topic_id" binding:"-"`
     Value     string             `bson:"value" json:"value" binding:"required"`
     Timestamp int64              `bson:"create_time" json:"timestamp" binding:"-"`
     HashCode  []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
 }
 
-// 订阅者
-// collection_name: subscriber
+// Subscriber collection_name: subscriber
 type Subscriber struct {
-    Id         primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
+    ID         primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
     ServerName string             `bson:"sub_server_name" json:"sub_server_name" binding:"required"`
     Host       string             `bson:"sub_Host" json:"sub_host" binding:"required"`
     Key        string             `bson:"sub_key" json:"sub_key" binding:"required"`
@@ -89,10 +84,9 @@ type Subscriber struct {
     HashCode   []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
 }
 
-// 发布者
-// collection_name: owner
+// Owner collection_name: owner
 type Owner struct {
-    Id         primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
+    ID          primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
     ServerName string             `bson:"owner_server_name" json:"owner_server_name" binding:"required"`
     Key        string             `bson:"owner_key" json:"owner_key" binding:"required"` // Owner's key
     Host       string             `bson:"owner_host" json:"owner_host" binding:"required"`
@@ -185,7 +179,7 @@ func (o *Owner) Equal(target Owner) bool {
 
 func (t *Topic) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": t.HashCode}
-    findResult, err := mongoUtils.FindOne(DB_TOPIC, spc)
+    findResult, err := mongoUtils.FindOne(DbTopic, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -203,7 +197,7 @@ func (t *Topic) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 }
 func (m *Message) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": m.HashCode}
-    findResult, err := mongoUtils.FindOne(DB_MESSAGE, spc)
+    findResult, err := mongoUtils.FindOne(DbMessage, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -222,7 +216,7 @@ func (m *Message) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) 
 
 func (s *Subscriber) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": s.HashCode}
-    findResult, err := mongoUtils.FindOne(DB_SUBSCRIBER, spc)
+    findResult, err := mongoUtils.FindOne(DbSubscriber, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -240,7 +234,7 @@ func (s *Subscriber) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, erro
 }
 func (o *Owner) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
     spc := bson.M{"hash_code": o.HashCode}
-    findResult, err := mongoUtils.FindOne(DB_OWNER, spc)
+    findResult, err := mongoUtils.FindOne(DbOwner, spc)
     if err != nil {
         if strings.Contains(err.Error(), "no documents in result") {
             return false, nil
@@ -279,7 +273,7 @@ func (t *Topic) GetAllSubscribers() ([]Subscriber, error) {
     mongoUtils.SetDB(mongoUtils.DBName)
     defer mongoUtils.CloseConn()
 
-    findResult, err := mongoUtils.FindMore(DB_SUBSCRIBER, bson.M{"topic_id": t.Id})
+    findResult, err := mongoUtils.FindMore(DbSubscriber, bson.M{"topic_id": t.ID})
     if err != nil {
         return nil, err
     }
@@ -299,7 +293,7 @@ func (t *Topic) GetRedisKey() string {
 }
 
 func (m *Message) GetRedisKey() string {
-    return "message_item_" + hex.EncodeToString(m.Id[:])
+    return "message_item_" + hex.EncodeToString(m.ID[:])
 }
 
 func (s *Subscriber) GetRedisKey() string {

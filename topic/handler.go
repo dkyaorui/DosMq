@@ -1,4 +1,4 @@
-package topicCenter
+package topic
 
 import (
     Mongodb "DosMq/db/mongo"
@@ -13,7 +13,7 @@ import (
     "net/http"
 )
 
-func TopicRegisterHandler(c *gin.Context) {
+func RegisterTopicHandler(c *gin.Context) {
     var owner modules.Owner
     var topic modules.Topic
     var err error
@@ -43,9 +43,9 @@ func TopicRegisterHandler(c *gin.Context) {
 
     // curd
     topic.HashCode = topic.GetHashCode()
-    topic.Id = primitive.NewObjectID()
-    owner.TopicID = topic.Id
-    owner.Id = primitive.NewObjectID()
+    topic.ID = primitive.NewObjectID()
+    owner.TopicID = topic.ID
+    owner.ID = primitive.NewObjectID()
     owner.HashCode = owner.GetHashCode()
     topic.Owner = owner
     // check is data repeat
@@ -68,7 +68,7 @@ func TopicRegisterHandler(c *gin.Context) {
     byteTopic, _ := bson.Marshal(&topic)
     doc := bson.M{}
     _ = bson.Unmarshal(byteTopic, &doc)
-    _, err = mongoUtils.InsertOne(modules.DB_TOPIC, doc)
+    _, err = mongoUtils.InsertOne(modules.DbTopic, doc)
     if err != nil {
         log.Infof("insert data error. data:%v", topic)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -96,10 +96,10 @@ func TopicRegisterHandler(c *gin.Context) {
     byteOwner, _ := bson.Marshal(&owner)
     doc = bson.M{}
     _ = bson.Unmarshal(byteOwner, &doc)
-    _, err = mongoUtils.InsertOne(modules.DB_OWNER, doc)
+    _, err = mongoUtils.InsertOne(modules.DbOwner, doc)
     if err != nil {
         log.Infof("insert data error. data:%v", topic)
-        _, _ = mongoUtils.DelOne("topic", bson.M{"_id": owner.Id})
+        _, _ = mongoUtils.DelOne("topic", bson.M{"_id": owner.ID})
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
             Data: err.Error(),
@@ -108,7 +108,7 @@ func TopicRegisterHandler(c *gin.Context) {
     }
     log.Infof("[insert]owner:%v", owner)
     queChannel := &mq.NewQueueChannel
-    *queChannel <- topic.Id.Hex()
+    *queChannel <- topic.ID.Hex()
     c.JSON(http.StatusOK, utils.RequestResult{
         Code: http.StatusOK,
         Data: "register topic success",
@@ -119,7 +119,7 @@ func TopicRegisterHandler(c *gin.Context) {
    receive the owner info(key, server_name, host), then find the topic_id.
    Before delete the topic, we need del the subscribers first.
 */
-func TopicDelHandler(c *gin.Context) {
+func DelTopicHandler(c *gin.Context) {
     var owner modules.Owner
     var err error
     if err = c.ShouldBindBodyWith(&owner, binding.JSON); err != nil {
@@ -138,7 +138,7 @@ func TopicDelHandler(c *gin.Context) {
 
     // main
     spc := bson.M{"hash_code": owner.HashCode}
-    findResult, err := mongoUtils.FindOne(modules.DB_OWNER, spc)
+    findResult, err := mongoUtils.FindOne(modules.DbOwner, spc)
     if err != nil {
         log.Errorf("[find error] owner:%v", owner)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -155,7 +155,7 @@ func TopicDelHandler(c *gin.Context) {
         return
     }
     // del subscriber
-    delResult, err := mongoUtils.DelMany(modules.DB_SUBSCRIBER, bson.M{"topic_id": owner.TopicID})
+    delResult, err := mongoUtils.DelMany(modules.DbSubscriber, bson.M{"topic_id": owner.TopicID})
     if err != nil {
         log.Errorf("[delete error] subscriber's topic id: %v", owner.TopicID)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -166,7 +166,7 @@ func TopicDelHandler(c *gin.Context) {
     }
     log.Infof("[delete] delete %d rows", delResult.DeletedCount)
     // del topic
-    _, err = mongoUtils.DelOne(modules.DB_TOPIC, bson.M{"_id": owner.TopicID})
+    _, err = mongoUtils.DelOne(modules.DbTopic, bson.M{"_id": owner.TopicID})
     if err != nil {
         log.Errorf("[delete error] topic id: %v", owner.TopicID)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -177,16 +177,16 @@ func TopicDelHandler(c *gin.Context) {
     }
     log.Infof("[delete] topic id: %v", owner.TopicID)
     // del owner
-    _, err = mongoUtils.DelOne(modules.DB_OWNER, bson.M{"_id": owner.Id})
+    _, err = mongoUtils.DelOne(modules.DbOwner, bson.M{"_id": owner.ID})
     if err != nil {
-        log.Errorf("[delete error] owner id: %v", owner.Id)
+        log.Errorf("[delete error] owner id: %v", owner.ID)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
             Data: err.Error(),
         })
         return
     }
-    log.Infof("[delete] owner id: %v", owner.Id)
+    log.Infof("[delete] owner id: %v", owner.ID)
     mq.DelTopicChannel <- owner.TopicID.Hex()
     c.JSON(http.StatusOK, utils.RequestResult{
         Code: http.StatusOK,
@@ -224,7 +224,7 @@ func SubscribeNewsHandler(c *gin.Context) {
     // main
     owner.HashCode = owner.GetHashCode()
     spc := bson.M{"hash_code": owner.HashCode}
-    findResult, err := mongoUtils.FindOne(modules.DB_OWNER, spc)
+    findResult, err := mongoUtils.FindOne(modules.DbOwner, spc)
     if err != nil {
         log.Errorf("[find error] owner:%v", owner)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -261,7 +261,7 @@ func SubscribeNewsHandler(c *gin.Context) {
         return
     }
 
-    findResult, err = mongoUtils.FindOne(modules.DB_TOPIC, bson.M{"_id": owner.TopicID})
+    findResult, err = mongoUtils.FindOne(modules.DbTopic, bson.M{"_id": owner.TopicID})
     if err != nil {
         log.Errorf("[find error] owner:%v", owner)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -284,15 +284,15 @@ func SubscribeNewsHandler(c *gin.Context) {
         topic.Subscribers = append(topic.Subscribers, subscriber)
     }
     _, err = mongoUtils.UpdateOne(
-        modules.DB_TOPIC,
-        bson.M{"_id": topic.Id},
+        modules.DbTopic,
+        bson.M{"_id": topic.ID},
         bson.M{
             "$set": bson.M{
                 "subscribers": topic.Subscribers,
             },
         })
     if err != nil {
-        log.Errorf("[update error] topic's _id:%s", topic.Id)
+        log.Errorf("[update error] topic's _id:%s", topic.ID)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
             Data: err.Error(),
@@ -300,10 +300,10 @@ func SubscribeNewsHandler(c *gin.Context) {
         return
     }
     doc := bson.M{}
-    subscriber.Id = primitive.NewObjectID()
+    subscriber.ID = primitive.NewObjectID()
     byteSubscriber, _ := bson.Marshal(subscriber)
     _ = bson.Unmarshal(byteSubscriber, &doc)
-    _, err = mongoUtils.InsertOne(modules.DB_SUBSCRIBER, doc)
+    _, err = mongoUtils.InsertOne(modules.DbSubscriber, doc)
     if err != nil {
         log.Infof("[insert error]data: %v", subscriber)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -338,7 +338,7 @@ func CancelSubscribeHandler(c *gin.Context) {
     defer mongoUtils.CloseConn()
 
     spc := bson.M{"hash_code": subscribe.HashCode}
-    findResult, err := mongoUtils.FindOne(modules.DB_SUBSCRIBER, spc)
+    findResult, err := mongoUtils.FindOne(modules.DbSubscriber, spc)
     if err != nil {
         log.Errorf("[find error] subscriber:%v", subscribe)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -358,7 +358,7 @@ func CancelSubscribeHandler(c *gin.Context) {
 
     var topic modules.Topic
     spc = bson.M{"_id": subscribe.TopicId}
-    findResult, err = mongoUtils.FindOne(modules.DB_TOPIC, spc)
+    findResult, err = mongoUtils.FindOne(modules.DbTopic, spc)
     if err != nil {
         log.Errorf("[find error] topic:%+v", err)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
@@ -378,15 +378,15 @@ func CancelSubscribeHandler(c *gin.Context) {
 
     topic.DelSubscribe(subscribe)
     _, err = mongoUtils.UpdateOne(
-        modules.DB_TOPIC,
-        bson.M{"_id": topic.Id},
+        modules.DbTopic,
+        bson.M{"_id": topic.ID},
         bson.M{
             "$set": bson.M{
                 "subscribers": topic.Subscribers,
             },
         })
     if err != nil {
-        log.Errorf("[update error] topic's _id:%s", topic.Id)
+        log.Errorf("[update error] topic's _id:%s", topic.ID)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
             Data: err.Error(),
@@ -394,17 +394,17 @@ func CancelSubscribeHandler(c *gin.Context) {
         return
     }
 
-    spc = bson.M{"_id": subscribe.Id}
-    _, err = mongoUtils.DelOne(modules.DB_SUBSCRIBER, spc)
+    spc = bson.M{"_id": subscribe.ID}
+    _, err = mongoUtils.DelOne(modules.DbSubscriber, spc)
     if err != nil {
-        log.Errorf("[delete error] subscriber id: %v", subscribe.Id)
+        log.Errorf("[delete error] subscriber id: %v", subscribe.ID)
         c.AbortWithStatusJSON(http.StatusBadGateway, utils.RequestResult{
             Code: http.StatusBadGateway,
             Data: err.Error(),
         })
         return
     }
-    log.Infof("[delete] subscriber id: %v", subscribe.Id)
+    log.Infof("[delete] subscriber id: %v", subscribe.ID)
 
     c.JSON(http.StatusOK, utils.RequestResult{
         Code: http.StatusOK,

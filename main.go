@@ -15,43 +15,44 @@ eg:
 package main
 
 import (
-    "DosMq/db/mongo"
-    "DosMq/db/redis"
-    "DosMq/mq"
-    "DosMq/router"
-    "DosMq/utils"
-    "flag"
-    "fmt"
-    log "github.com/sirupsen/logrus"
-    "time"
+	"DosMq/db/mongo"
+	"DosMq/db/redis"
+	"DosMq/mq"
+	"DosMq/router"
+	"DosMq/utils"
+	"flag"
+	"fmt"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-    // time init
-    loc, _ := time.LoadLocation("Asia/Chongqing")
-    fmt.Printf("时区: %s\n", loc)
+	// time init
+	loc, _ := time.LoadLocation("Asia/Chongqing")
+	fmt.Printf("时区: %s\n", loc)
 
-    // config init
-    configName := flag.String("configName", "config", "config file's name.")
-    configPath := flag.String("configPath", "./config", "config file's path.")
-    utils.ConfigInit(configName, configPath)
+	// config init
+	configName := flag.String("configName", "config", "config file's name.")
+	configPath := flag.String("configPath", "./config", "config file's path.")
+	utils.ConfigInit(configName, configPath)
 
-    // log init
-    utils.LogInit()
+	// log init
+	utils.LogInit()
 
-    // db init
-    redis.Init()
-    mongo.Init()
+	// db init
+	redis.Init()
+	mongo.Init()
 
-    // load router
-    r := router.GetRouter()
-    log.Info("router loaded……")
+	// load router
+	r := router.GetRouter()
+	log.Info("router loaded……")
 
-    // start listen message queue
-    go mq.StartProcess()
+	// start listen message queue
+	go mq.StartProcess()
 
-    // run server
-    if err := r.Run(":8080"); err != nil {
-        log.Error(err)
-    }
+	// run server
+	if err := r.Run(":8080"); err != nil {
+		log.Error(err)
+	}
 }
