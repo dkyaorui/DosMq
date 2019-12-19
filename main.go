@@ -15,14 +15,18 @@ eg:
 package main
 
 import (
+	"DosMq/consumer"
 	"DosMq/db/mongo"
 	"DosMq/db/redis"
 	"DosMq/mq"
-	"DosMq/router"
+	"DosMq/producer"
+	"DosMq/topic"
 	"DosMq/utils"
 	"flag"
 	"fmt"
 	"time"
+
+	"github.com/gin-gonic/gin"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -45,7 +49,7 @@ func main() {
 	mongo.Init()
 
 	// load router
-	r := router.GetRouter()
+	r := GetRouter()
 	log.Info("router loaded……")
 
 	// start listen message queue
@@ -55,4 +59,13 @@ func main() {
 	if err := r.Run(":8080"); err != nil {
 		log.Error(err)
 	}
+}
+
+// GetRouter return all routes
+func GetRouter() *gin.Engine {
+	router := gin.Default()
+	consumer.Routes(router)
+	producer.Routes(router)
+	topic.Routes(router)
+	return router
 }
