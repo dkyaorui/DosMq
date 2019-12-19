@@ -27,8 +27,10 @@ type DbMongoUtils struct {
 	authSource string
 }
 
+// Utils mongodb tool in global
 var Utils DbMongoUtils
 
+// Init mongodb init func
 func Init() {
 	mongoConfig := viper.GetStringMap("mongo")
 	Utils = DbMongoUtils{
