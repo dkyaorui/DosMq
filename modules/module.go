@@ -4,7 +4,6 @@ import (
 	myMongo "DosMq/db/mongo"
 	"bytes"
 	"crypto/md5"
-	"encoding/hex"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -161,9 +160,8 @@ func (m *Message) Equal(target Message) bool {
 			return true
 		}
 		return false
-	} else {
-		return false
 	}
+	return false
 }
 
 // Equal equal two Subscriber struct
@@ -177,9 +175,9 @@ func (s *Subscriber) Equal(target Subscriber) bool {
 			return true
 		}
 		return false
-	} else {
-		return false
 	}
+	return false
+
 }
 
 // Equal equal two Owner struct
@@ -191,9 +189,9 @@ func (o *Owner) Equal(target Owner) bool {
 			return true
 		}
 		return false
-	} else {
-		return false
 	}
+	return false
+
 }
 
 // CheckIsRepeat check the topic is repeat
@@ -276,6 +274,7 @@ func (o *Owner) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 	return false, nil
 }
 
+// FindIndexInSubscribers find the topic's subscribe by hashCode
 func (t *Topic) FindIndexInSubscribers(target Subscriber) int {
 	for index, sub := range t.Subscribers {
 		if bytes.Compare(sub.HashCode[:], target.HashCode[:]) == 0 {
@@ -285,6 +284,7 @@ func (t *Topic) FindIndexInSubscribers(target Subscriber) int {
 	return -1
 }
 
+// DelSubscribe del one subscribe of topic
 func (t *Topic) DelSubscribe(target Subscriber) {
 	subIndex := t.FindIndexInSubscribers(target)
 	if subIndex != -1 {
@@ -292,6 +292,7 @@ func (t *Topic) DelSubscribe(target Subscriber) {
 	}
 }
 
+// GetAllSubscribers return all subscribers of topic
 func (t *Topic) GetAllSubscribers() ([]Subscriber, error) {
 	mongoUtils := myMongo.Utils
 	mongoUtils.OpenConn()
@@ -313,26 +314,26 @@ func (t *Topic) GetAllSubscribers() ([]Subscriber, error) {
 	return subscribers, nil
 }
 
-func (t *Topic) GetRedisKey() string {
-	return "topic_" + hex.EncodeToString(t.HashCode)
-}
+// func (t *Topic) GetRedisKey() string {
+// 	return "topic_" + hex.EncodeToString(t.HashCode)
+// }
 
-func (m *Message) GetRedisKey() string {
-	return "message_item_" + hex.EncodeToString(m.ID[:])
-}
+// func (m *Message) GetRedisKey() string {
+// 	return "message_item_" + hex.EncodeToString(m.ID[:])
+// }
 
-func (s *Subscriber) GetRedisKey() string {
-	return "subscriber_" + hex.EncodeToString(s.HashCode)
-}
+// func (s *Subscriber) GetRedisKey() string {
+// 	return "subscriber_" + hex.EncodeToString(s.HashCode)
+// }
 
-func (o *Owner) GetRedisKey() string {
-	return "owner_" + hex.EncodeToString(o.HashCode)
-}
+// func (o *Owner) GetRedisKey() string {
+// 	return "owner_" + hex.EncodeToString(o.HashCode)
+// }
 
-func (m *Message) GetMqKey() string {
-	return "message_" + hex.EncodeToString(m.TopicId[:])
-}
+// func (m *Message) GetMqKey() string {
+// 	return "message_" + hex.EncodeToString(m.TopicId[:])
+// }
 
-func GetMqKeyByTopicId(topicID string) string {
-	return "message_" + topicID
-}
+// func GetMqKeyByTopicId(topicID string) string {
+// 	return "message_" + topicID
+// }
