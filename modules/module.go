@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -51,12 +50,12 @@ type ModuleUtils interface {
 
 // Topic collection_name: topic
 type Topic struct {
-	ID                 primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
-	Name               string             `bson:"name" json:"topic_name" binding:"required"`
-	ProcessMessageType string             `bson:"process_message_type" json:"topic_process_type" binding:"required"` // pull or push
-	Subscribers        []Subscriber       `bson:"subscribers" json:"topic_subscribers" binding:"-"`
-	Owner              Owner              `bson:"owner" json:"topic_owner" binding:"-"`
-	HashCode           []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
+	ID                 [12]byte     `json:"id" binding:"-"`
+	Name               [16]byte     `json:"topic_name" binding:"required"`
+	ProcessMessageType [4]byte      `json:"topic_process_type" binding:"required"` // pull or push
+	HashCode           [16]byte     `json:"hash_code" binding:"-"`
+	Owner              Owner        `json:"topic_owner" binding:"-"`
+	Subscribers        []Subscriber `json:"topic_subscribers" binding:"-"`
 }
 
 /*
@@ -69,81 +68,95 @@ when consumer use the message,query in redis first and if no data in redis then
 get message in queue.when the message is used then save it in mongodb.
 */
 type Message struct {
-	ID        primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
-	TopicId   primitive.ObjectID `bson:"topic_id" json:"topic_id" binding:"-"`
-	Value     string             `bson:"value" json:"value" binding:"required"`
-	Timestamp int64              `bson:"create_time" json:"timestamp" binding:"-"`
-	HashCode  []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
+	ID        [12]byte `json:"id" binding:"-"`
+	TopicID   [12]byte `json:"topic_id" binding:"-"`
+	HashCode  [16]byte `json:"hash_code" binding:"-"`
+	Timestamp int64    `json:"timestamp" binding:"-"`
+	Value     string   `json:"value" binding:"required"`
 }
 
 // Subscriber collection_name: subscriber
 type Subscriber struct {
-	ID         primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
-	ServerName string             `bson:"sub_server_name" json:"sub_server_name" binding:"required"`
-	Host       string             `bson:"sub_Host" json:"sub_host" binding:"required"`
-	Key        string             `bson:"sub_key" json:"sub_key" binding:"required"`
-	Api        string             `bson:"sub_api" json:"sub_api" binding:"required"`
-	Method     string             `bson:"sub_method" json:"sub_method" binding:"required"`
-	TopicId    primitive.ObjectID `bson:"topic_id" json:"sub_topic_id" binding:"-"`
-	HashCode   []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
+	ID         [12]byte `json:"id" binding:"-"`
+	ServerName [16]byte `json:"sub_server_name" binding:"required"`
+	HashCode   [16]byte `json:"hash_code" binding:"-"`
+	TopicID    [12]byte `json:"sub_topic_id" binding:"-"`
+	Method     [4]byte  `json:"sub_method" binding:"required"`
+	Host       string   `json:"sub_host" binding:"required"`
+	API        string   `json:"sub_api" binding:"required"`
+	Key        string   `json:"sub_key" binding:"required"`
 }
 
 // Owner collection_name: owner
 type Owner struct {
-	ID         primitive.ObjectID `bson:"_id" json:"id" binding:"-"`
-	ServerName string             `bson:"owner_server_name" json:"owner_server_name" binding:"required"`
-	Key        string             `bson:"owner_key" json:"owner_key" binding:"required"` // Owner's key
-	Host       string             `bson:"owner_host" json:"owner_host" binding:"required"`
-	TopicID    primitive.ObjectID `bson:"topic_id" json:"owner_topic_id" binding:"-"`
-	HashCode   []byte             `bson:"hash_code" json:"hash_code" binding:"-"`
+	ID         [12]byte `json:"id" binding:"-"`
+	TopicID    [12]byte `json:"owner_topic_id" binding:"-"`
+	HashCode   [16]byte `json:"hash_code" binding:"-"`
+	ServerName [16]byte `json:"owner_server_name" binding:"required"`
+	Key        string   `json:"owner_key" binding:"required"` // Owner's key
+	Host       string   `json:"owner_host" binding:"required"`
 }
 
+// GetHashCode generate topic hashcode
+// hash_code = name + process_message_type + owner.host + owner.key
 func (t *Topic) GetHashCode() []byte {
-	// hash_code = name + process_message_type + owner.host + owner.key
-	hashCode := md5.Sum([]byte(t.Name + t.ProcessMessageType + t.Owner.Key + t.Owner.Host))
+	var buffer bytes.Buffer
+	buffer.Write(t.Name[:])
+	buffer.Write(t.ProcessMessageType[:])
+	buffer.Write([]byte(t.Owner.Key + t.Owner.Host))
+	hashCode := md5.Sum(buffer.Bytes())
 	return hashCode[:]
 }
 
+// GetHashCode generate Message hashcode
+// hash_code = topicA_id + value
 func (m *Message) GetHashCode() []byte {
-	// hash_code = topicA_id + value
 	var buffer bytes.Buffer
-	buffer.Write(m.TopicId[:])
+	buffer.Write(m.TopicID[:])
 	buffer.Write([]byte(m.Value))
 	hashCode := md5.Sum(buffer.Bytes())
 	return hashCode[:]
 }
 
+// GetHashCode generate Subscriber hashcode
+// hash_code = server_name + host + key + api + method
 func (s *Subscriber) GetHashCode() []byte {
-	// hash_code = server_name + host + key + api + method
-	hashCode := md5.Sum([]byte(s.ServerName + s.Host + s.Key + s.Api + s.Method))
-	return hashCode[:]
-}
-
-func (o *Owner) GetHashCode() []byte {
-	// hash_code = host + key + ServerName
 	var buffer bytes.Buffer
-	buffer.Write([]byte(o.Host + o.Key + o.ServerName))
+	buffer.Write(s.ServerName[:])
+	buffer.Write([]byte(s.Host + s.Key + s.API))
+	buffer.Write(s.Method[:])
 	hashCode := md5.Sum(buffer.Bytes())
 	return hashCode[:]
 }
 
+// GetHashCode generate Owner hashcode
+// hash_code = host + key + ServerName
+func (o *Owner) GetHashCode() []byte {
+	var buffer bytes.Buffer
+	buffer.Write([]byte(o.Host + o.Key))
+	buffer.Write(o.ServerName[:])
+	hashCode := md5.Sum(buffer.Bytes())
+	return hashCode[:]
+}
+
+// Equal equal two topic struct
 func (t *Topic) Equal(target Topic) bool {
-	if bytes.Compare(t.HashCode, target.HashCode) == 0 {
-		if strings.Compare(t.Name, target.Name) == 0 &&
-			strings.Compare(t.ProcessMessageType, target.ProcessMessageType) == 0 &&
+	if bytes.Compare(t.HashCode[:], target.HashCode[:]) == 0 {
+		if bytes.Compare(t.Name[:], target.Name[:]) == 0 &&
+			bytes.Compare(t.ProcessMessageType[:], target.ProcessMessageType[:]) == 0 &&
 			strings.Compare(t.Owner.Host, target.Owner.Host) == 0 &&
 			strings.Compare(t.Owner.Key, target.Owner.Key) == 0 {
 			return true
 		}
 		return false
-	} else {
-		return false
 	}
+	return false
 }
 
+// Equal equal two Message struct
 func (m *Message) Equal(target Message) bool {
-	if bytes.Compare(m.HashCode, target.HashCode) == 0 {
-		if bytes.Compare(m.TopicId[:], target.TopicId[:]) == 0 &&
+	if bytes.Compare(m.HashCode[:], target.HashCode[:]) == 0 {
+		if bytes.Compare(m.TopicID[:], target.TopicID[:]) == 0 &&
 			strings.Compare(m.Value, target.Value) == 0 {
 			return true
 		}
@@ -153,13 +166,14 @@ func (m *Message) Equal(target Message) bool {
 	}
 }
 
+// Equal equal two Subscriber struct
 func (s *Subscriber) Equal(target Subscriber) bool {
-	if bytes.Compare(s.HashCode, target.HashCode) == 0 {
-		if strings.Compare(s.ServerName, target.ServerName) == 0 &&
+	if bytes.Compare(s.HashCode[:], target.HashCode[:]) == 0 {
+		if bytes.Compare(s.ServerName[:], target.ServerName[:]) == 0 &&
 			strings.Compare(s.Host, target.Host) == 0 &&
 			strings.Compare(s.Key, target.Key) == 0 &&
-			strings.Compare(s.Api, target.Api) == 0 &&
-			strings.Compare(s.Method, target.Method) == 0 {
+			strings.Compare(s.API, target.API) == 0 &&
+			bytes.Compare(s.Method[:], target.Method[:]) == 0 {
 			return true
 		}
 		return false
@@ -168,11 +182,12 @@ func (s *Subscriber) Equal(target Subscriber) bool {
 	}
 }
 
+// Equal equal two Owner struct
 func (o *Owner) Equal(target Owner) bool {
-	if bytes.Compare(o.HashCode, target.HashCode) == 0 {
+	if bytes.Compare(o.HashCode[:], target.HashCode[:]) == 0 {
 		if strings.Compare(o.Host, target.Host) == 0 &&
 			strings.Compare(o.Key, target.Key) == 0 &&
-			strings.Compare(o.ServerName, target.ServerName) == 0 {
+			bytes.Compare(o.ServerName[:], target.ServerName[:]) == 0 {
 			return true
 		}
 		return false
@@ -181,6 +196,7 @@ func (o *Owner) Equal(target Owner) bool {
 	}
 }
 
+// CheckIsRepeat check the topic is repeat
 func (t *Topic) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 	spc := bson.M{"hash_code": t.HashCode}
 	findResult, err := mongoUtils.FindOne(DbTopic, spc)
@@ -199,6 +215,8 @@ func (t *Topic) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 	}
 	return false, nil
 }
+
+// CheckIsRepeat check the topic is repeat
 func (m *Message) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 	spc := bson.M{"hash_code": m.HashCode}
 	findResult, err := mongoUtils.FindOne(DbMessage, spc)
@@ -218,6 +236,7 @@ func (m *Message) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) 
 	return false, nil
 }
 
+// CheckIsRepeat check the topic is repeat
 func (s *Subscriber) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 	spc := bson.M{"hash_code": s.HashCode}
 	findResult, err := mongoUtils.FindOne(DbSubscriber, spc)
@@ -236,6 +255,8 @@ func (s *Subscriber) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, erro
 	}
 	return false, nil
 }
+
+// CheckIsRepeat check the topic is repeat
 func (o *Owner) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 	spc := bson.M{"hash_code": o.HashCode}
 	findResult, err := mongoUtils.FindOne(DbOwner, spc)
@@ -257,7 +278,7 @@ func (o *Owner) CheckIsRepeat(mongoUtils *myMongo.DbMongoUtils) (bool, error) {
 
 func (t *Topic) FindIndexInSubscribers(target Subscriber) int {
 	for index, sub := range t.Subscribers {
-		if bytes.Compare(sub.HashCode, target.HashCode) == 0 {
+		if bytes.Compare(sub.HashCode[:], target.HashCode[:]) == 0 {
 			return index
 		}
 	}

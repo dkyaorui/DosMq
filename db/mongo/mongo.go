@@ -73,7 +73,6 @@ func (m *DbMongoUtils) OpenConn() {
 	if _, err := url.Parse(mongoUri); err != nil {
 		log.Panicf("%+v", err)
 		panic(err)
-		return
 	}
 	opts := &options.ClientOptions{}
 	opts.SetAuth(options.Credential{AuthSource: m.authSource, Username: m.user, Password: m.password})
@@ -84,12 +83,10 @@ func (m *DbMongoUtils) OpenConn() {
 	if client, err = mongo.Connect(ctx, opts); err != nil {
 		log.Panicf("%+v", err)
 		panic(err)
-		return
 	}
 	if err = client.Ping(ctx, readpref.Primary()); err != nil {
 		log.Panicf("%+v", err)
 		panic(err)
-		return
 	}
 	m.Client = client
 }
