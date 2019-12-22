@@ -49,12 +49,12 @@ type ModuleUtils interface {
 
 // Topic collection_name: topic
 type Topic struct {
-	ID                 [12]byte     `json:"id" binding:"-"`
-	Name               [16]byte     `json:"topic_name" binding:"required"`
-	ProcessMessageType [4]byte      `json:"topic_process_type" binding:"required"` // pull or push
-	HashCode           [16]byte     `json:"hash_code" binding:"-"`
-	Owner              Owner        `json:"topic_owner" binding:"-"`
-	Subscribers        []Subscriber `json:"topic_subscribers" binding:"-"`
+	ID                 [12]byte
+	Name               [16]byte
+	ProcessMessageType [4]byte // pull or push
+	HashCode           [16]byte
+	Owner              Owner
+	Subscribers        []Subscriber
 }
 
 /*
@@ -67,33 +67,35 @@ when consumer use the message,query in redis first and if no data in redis then
 get message in queue.when the message is used then save it in mongodb.
 */
 type Message struct {
-	ID        [12]byte `json:"id" binding:"-"`
-	TopicID   [12]byte `json:"topic_id" binding:"-"`
-	HashCode  [16]byte `json:"hash_code" binding:"-"`
-	Timestamp int64    `json:"timestamp" binding:"-"`
-	Value     string   `json:"value" binding:"required"`
+	ID          [12]byte
+	TopicID     [12]byte
+	HashCode    [16]byte
+	Timestamp   int64
+	OffSet      int64
+	MessageSize int32
+	Value       string
 }
 
 // Subscriber collection_name: subscriber
 type Subscriber struct {
-	ID         [12]byte `json:"id" binding:"-"`
-	ServerName [16]byte `json:"sub_server_name" binding:"required"`
-	HashCode   [16]byte `json:"hash_code" binding:"-"`
-	TopicID    [12]byte `json:"sub_topic_id" binding:"-"`
-	Method     [4]byte  `json:"sub_method" binding:"required"`
-	Host       string   `json:"sub_host" binding:"required"`
-	API        string   `json:"sub_api" binding:"required"`
-	Key        string   `json:"sub_key" binding:"required"`
+	ID         [12]byte
+	ServerName [16]byte
+	HashCode   [16]byte
+	TopicID    [12]byte
+	Method     [4]byte
+	Host       string
+	API        string
+	Key        string
 }
 
 // Owner collection_name: owner
 type Owner struct {
-	ID         [12]byte `json:"id" binding:"-"`
-	TopicID    [12]byte `json:"owner_topic_id" binding:"-"`
-	HashCode   [16]byte `json:"hash_code" binding:"-"`
-	ServerName [16]byte `json:"owner_server_name" binding:"required"`
-	Key        string   `json:"owner_key" binding:"required"` // Owner's key
-	Host       string   `json:"owner_host" binding:"required"`
+	ID         [12]byte
+	TopicID    [12]byte
+	HashCode   [16]byte
+	ServerName [16]byte
+	Key        string // Owner's key
+	Host       string
 }
 
 // GetHashCode generate topic hashcode
